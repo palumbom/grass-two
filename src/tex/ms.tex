@@ -1,0 +1,60 @@
+% Define document class
+\documentclass[twocolumn]{aastex631}
+\usepackage{showyourwork}
+
+% Begin!
+\begin{document}
+
+% Title
+\title{An open source scientific article}
+
+% Author list
+\author{@MilesCranmer}
+
+% Abstract with filler text
+\begin{abstract}
+    Lorem ipsum dolor sit amet, consectetuer adipiscing elit.
+    Ut purus elit, vestibulum ut, placerat ac, adipiscing vitae, felis.
+    Curabitur dictum gravida mauris, consectetuer id, vulputate a, magna.
+    Donec vehicula augue eu neque, morbi tristique senectus et netus et.
+    Mauris ut leo, cras viverra metus rhoncus sem, nulla et lectus vestibulum.
+    Phasellus eu tellus sit amet tortor gravida placerat.
+    Integer sapien est, iaculis in, pretium quis, viverra ac, nunc.
+    Praesent eget sem vel leo ultrices bibendum.
+    Aenean faucibus, morbi dolor nulla, malesuada eu, pulvinar at, mollis ac.
+    Curabitur auctor semper nulla donec varius orci eget risus.
+    Duis nibh mi, congue eu, accumsan eleifend, sagittis quis, diam.
+    Duis eget orci sit amet orci dignissim rutrum.
+\end{abstract}
+
+% Main body with filler text
+\section{Introduction}
+\label{sec:intro}
+
+Lorem ipsum dolor sit amet, consectetuer adipiscing elit.
+Ut purus elit, vestibulum ut, placerat ac, adipiscing vitae, felis.
+Curabitur dictum gravida mauris, consectetuer id, vulputate a, magna.
+Donec vehicula augue eu neque, morbi tristique senectus et netus et.
+Mauris ut leo, cras viverra metus rhoncus sem, nulla et lectus vestibulum.
+Phasellus eu tellus sit amet tortor gravida placerat.
+Integer sapien est, iaculis in, pretium quis, viverra ac, nunc.
+Praesent eget sem vel leo ultrices bibendum.
+Aenean faucibus, morbi dolor nulla, malesuada eu, pulvinar at, mollis ac.
+Curabitur auctor semper nulla donec varius orci eget risus.
+Duis nibh mi, congue eu, accumsan eleifend, sagittis quis, diam.
+Duis eget orci sit amet orci dignissim rutrum.
+
+% Figure:
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=0.5\textwidth]{figures/myplot.png}
+    \caption{A figure.}
+    \label{fig:fig1}
+    \script{../scripts/plot.jl}
+\end{figure}
+
+\clearpage
+
+\bibliography{bib}
+
+\end{document}
