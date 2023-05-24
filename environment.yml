@@ -1,2 +1,6 @@
 channels:
   - conda-forge
+dependencies:
+  - pip:
+      - matplotlib>=3.4.3
+      - adjustText=0.8
