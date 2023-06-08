@@ -33,7 +33,7 @@ function model_iag_blends(wavs_sim::AbstractArray{T,1}, flux_sim::AbstractArray{
                           wavs_iag::AbstractArray{T,1}, flux_iag::AbstractArray{T,1};
                           plot=false) where T<:Float64
     # calculate the residuals
-    resids = flux_iag .- flux_sim
+    resids = flux_sim .- flux_iag
 
     # models for fit
     @. gaussian(x, a, b, c) = a * exp(-(x - b)^2/(2 * c^2)) + 1
@@ -47,19 +47,34 @@ function model_iag_blends(wavs_sim::AbstractArray{T,1}, flux_sim::AbstractArray{
     end
 
     # identify peaks in the residuals
-    max_resid = 0.01
-    minprom = 0.001
+    minresid = 0.01
+    w = 4
 
-    # guess the number of fits needed from minima
-    m_inds = Peaks.argmaxima(.-resids, 10, strict=false)
-    m_inds, m_proms = Peaks.peakproms(m_inds, .-resids, minprom=minprom, strict=false)
-    m_inds, m_widths, m_left, m_right = Peaks.peakwidths(m_inds, .-resids, m_proms, strict=false)
+    # get the indices of maxima in resids
+    m_inds = Peaks.argmaxima(resids, w, strict=false)
 
-    idx = findfirst(x -> isapprox.(x, minimum(wavs_sim), atol=1e-1), wavs_iag[m_inds])
-    m_inds = deleteat!(m_inds, [idx])
-    m_widths = deleteat!(m_widths, [idx])
-    m_left = deleteat!(m_left, [idx])
-    m_right = deleteat!(m_right, [idx])
+    # only keep ones above threshold
+    peak_resids = resids[m_inds]
+    m_inds = m_inds[(peak_resids) .>= minresid]
+
+    # check that it's not empty
+    if isnothing(m_inds) | isempty(m_inds)
+        println("\t>>> No blends found above threshold....")
+        return flux_iag
+    end
+
+    # get prominences, widths, and bounds
+    m_inds, m_proms = Peaks.peakproms(m_inds, resids, strict=false)
+    m_inds, m_widths, m_left, m_right = Peaks.peakwidths(m_inds, resids, m_proms, strict=false)
+
+    # do not model anything within atol of line core
+    idx = findall(x -> isapprox.(x, minimum(wavs_sim), atol=1e-2), wavs_iag[m_inds])
+    if !isnothing(idx)
+        m_inds = deleteat!(m_inds, idx)
+        m_widths = deleteat!(m_widths, idx)
+        m_left = deleteat!(m_left, idx)
+        m_right = deleteat!(m_right, idx)
+    end
 
     # convert width from pixels to wavelength
     m_widths .*= (wavs_iag[2] - wavs_iag[1])
@@ -114,15 +129,15 @@ end
 # figure 3 -- compare synthetic and IAG spectra + bisectors
 function main()
     # get data
-    lp = GRASS.LineProperties(exclude=[""])
+    lp = GRASS.LineProperties(exclude=["NaI_5896"])
     files = GRASS.get_file(lp)
     line_names = GRASS.get_name(lp)
 
     # wavelength of line to synthesize/compare to iag
     for (i, file) in enumerate(files)
-        if !contains(file, "FeI_5434")
-            continue
-        end
+        # if !contains(file, "FeI_5434")
+        #     continue
+        # end
 
         println(">>> Running " * line_names[i] * "...")
 
@@ -136,12 +151,11 @@ function main()
         flux_iag ./= maximum(flux_iag)
 
         # convolve IAG spectrum to LARS resolution
-        wavs_iag1, flux_iag1 = GRASS.convolve_gauss(wavs_iag, flux_iag, new_res=7e5, oversampling=1.0)
+        wavs_iag, flux_iag = GRASS.convolve_gauss(wavs_iag, flux_iag, new_res=7e5, oversampling=1.0)
 
         # get depth from IAG spectrum
-        idx1 = findfirst(x -> x .<= airwav - 0.125, wavs_iag)
+        idx1 = findfirst(x -> x .>= airwav - 0.125, wavs_iag)
         idx2 = findfirst(x -> x .>= airwav + 0.125, wavs_iag)
-        botind = argmin(view(flux_iag, idx1:idx2)) + idx1
         iag_depth = 1.0 - minimum(view(flux_iag, idx1:idx2))
 
         # set up for GRASS spectrum simulation
@@ -162,13 +176,14 @@ function main()
         end
 
         # get the depth for the simulation
-        println("\t>>> Calculating optim depth for line synthesis...")
+        println("\t>>> Calculating optimized depth for line synthesis...")
         lower = [0.0]
         upper = [1.0]
         inner_optimizer = GradientDescent()
-        results = optimize(depth_diff, lower, upper, [iag_depth], Fminbox(inner_optimizer))
-        sim_depth = results.minimizer[1]
-        println("\t>>> Ideal depth = " * string(sim_depth))
+        # results = optimize(depth_diff, lower, upper, [iag_depth], Fminbox(inner_optimizer))
+        # sim_depth = results.minimizer[1]
+        sim_depth = iag_depth
+        println("\t>>> Optimized depth = " * string(sim_depth))
 
         # simulate the spectrum
         lines = [airwav]
@@ -184,9 +199,15 @@ function main()
                                                 verbose=false, seed_rng=true)
         flux_sim = dropdims(mean(flux_sim, dims=2), dims=2)
 
+        plt.plot(wavs_sim, flux_sim)
+        plt.plot(wavs_iag, flux_iag)
+        plt.plot(view(wavs_iag, idx1:idx2), view(flux_iag, idx1:idx2))
+        plt.show()
+        continue
+
         # get bisector for IAG and synthetic spectra
-        bis_iag, int_iag = GRASS.calc_bisector(wavs_iag, flux_iag, top=0.9)
-        bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, top=0.9)
+        bis_iag, int_iag = GRASS.calc_bisector(wavs_iag, flux_iag, nflux=50, top=0.9)
+        bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=50, top=0.9)
 
         # convert wavelengths to vel grids
         vel_iag = GRASS.c_ms .* (bis_iag .- airwav) ./ (airwav)
@@ -197,10 +218,16 @@ function main()
         M = 0.75
         idx1 = findfirst(x -> x .>= N * iag_depth + minimum(flux_iag), int_iag)
         idx2 = findfirst(x -> x .>= M * iag_depth + minimum(flux_iag), int_iag)
+        if isnothing(idx2)
+            idx2 = findfirst(x -> x .>= 0.9, int_iag)
+        end
         rv_iag = mean(view(vel_iag, idx1:idx2))
 
         idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim)
         idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim)
+        if isnothing(idx2)
+            idx2 = findfirst(x -> x .>= 0.9, int_sim)
+        end
         rv_sim = mean(view(vel_sim, idx1:idx2))
 
         # transform the bisectors
@@ -219,9 +246,9 @@ function main()
         mod_depth = 1.0 - minimum(flux_mod)
 
         # recompute bisectors b/c of interpolation
-        bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, top=0.9)
-        bis_iag, int_iag = GRASS.calc_bisector(wavs_iag, flux_iag, top=0.9)
-        bis_mod, int_mod = GRASS.calc_bisector(wavs_iag, flux_mod, top=0.9)
+        bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=50, top=0.9)
+        bis_iag, int_iag = GRASS.calc_bisector(wavs_iag, flux_iag, nflux=50, top=0.9)
+        bis_mod, int_mod = GRASS.calc_bisector(wavs_iag, flux_mod, nflux=50, top=0.9)
 
         # transform bisectors to velocities
         vel_sim = GRASS.c_ms .* (bis_sim .- airwav) ./ (airwav)
@@ -233,14 +260,23 @@ function main()
         M = 0.50
         idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim)
         idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim)
+        if isnothing(idx2)
+            idx2 = findfirst(x -> x .>= 0.9, int_sim)
+        end
         rv_sim = mean(view(vel_sim, idx1:idx2))
 
         idx1 = findfirst(x -> x .>= N * iag_depth + minimum(flux_iag), int_iag)
         idx2 = findfirst(x -> x .>= M * iag_depth + minimum(flux_iag), int_iag)
+        if isnothing(idx2)
+            idx2 = findfirst(x -> x .>= 0.9, int_iag)
+        end
         rv_iag = mean(view(vel_iag, idx1:idx2))
 
         idx1 = findfirst(x -> x .>= N * mod_depth + minimum(flux_mod), int_mod)
         idx2 = findfirst(x -> x .>= M * mod_depth + minimum(flux_mod), int_mod)
+        if isnothing(idx2)
+            idx2 = findfirst(x -> x .>= 0.9, int_mod)
+        end
         rv_mod = mean(view(vel_mod, idx1:idx2))
 
         # align the bisectors
@@ -294,21 +330,21 @@ function main()
             ax2 = fig.add_subplot(gs[2])
 
             # plot bisectors
-            ax1.plot(vel_sim[2:end], int_sim[2:end], color="black", lw=2.0, markevery=4, label=L"{\rm Synthetic}")
-            ax1.plot(vel_iag[2:end], int_iag[2:end], marker="s", c=colors[1], ms=2.0, lw=1.0, markevery=4, label=L"{\rm IAG}")
-            ax1.plot(vel_mod[2:end], int_mod[2:end], marker="o", c=colors[2], ms=2.0, lw=1.0, markevery=4, label=L"{\rm Cleaned\ IAG}")
+            ax1.plot(vel_sim[2:end], int_sim[2:end], color="black", lw=2.0, markevery=2, label=L"{\rm Synthetic}")
+            ax1.plot(vel_iag[2:end], int_iag[2:end], marker="s", c=colors[1], ms=2.0, lw=1.0, markevery=2, label=L"{\rm IAG}")
+            ax1.plot(vel_mod[2:end], int_mod[2:end], marker="o", c=colors[2], ms=2.0, lw=1.0, markevery=2, label=L"{\rm Cleaned\ IAG}")
 
             # plot residuals
-            ax2.plot(vel_iag[2:end] .- vel_sim[2:end], int_iag[2:end], c=colors[1], marker="s", ms=2.0, lw=0.0, markevery=4)
-            ax2.plot(vel_mod[2:end] .- vel_sim[2:end], int_mod[2:end], c=colors[2], marker="o", ms=2.0, lw=0.0, markevery=4)
+            ax2.plot(vel_iag[2:end] .- vel_sim[2:end], int_iag[2:end], c=colors[1], marker="s", ms=2.0, lw=0.0, markevery=2)
+            ax2.plot(vel_mod[2:end] .- vel_sim[2:end], int_mod[2:end], c=colors[2], marker="o", ms=2.0, lw=0.0, markevery=2)
 
             # set tick labels, axis labels, etc.
             ax2.set_yticklabels([])
             ax2.yaxis.tick_right()
             # ax1.set_xlim(5434.4, 5434.6)
-            ax1.set_ylim(0.1, 1.1)
+            ax1.set_ylim(minimum(flux_sim) - 0.1, 1.1)
             ax2.set_xlim(-35, 35)
-            ax2.set_ylim(0.1, 1.1)
+            ax2.set_ylim(minimum(flux_sim) - 0.1, 1.1)
             ax1.set_xlabel(L"{\rm Relative\ Velocity\ (ms^{-1})}", fontsize=12)
             ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
             ax2.set_xlabel(L"{\rm IAG\ -\ GRASS\ (ms^{-1})}", fontsize=12)
