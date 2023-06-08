@@ -129,13 +129,13 @@ end
 # figure 3 -- compare synthetic and IAG spectra + bisectors
 function main()
     # get data
-    lp = GRASS.LineProperties(exclude=["NaI_5896"])
+    lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
     files = GRASS.get_file(lp)
     line_names = GRASS.get_name(lp)
 
     # wavelength of line to synthesize/compare to iag
     for (i, file) in enumerate(files)
-        # if !contains(file, "FeI_5434")
+        # if !contains(file, "TiII_5381")
         #     continue
         # end
 
@@ -154,9 +154,9 @@ function main()
         wavs_iag, flux_iag = GRASS.convolve_gauss(wavs_iag, flux_iag, new_res=7e5, oversampling=1.0)
 
         # get depth from IAG spectrum
-        idx1 = findfirst(x -> x .>= airwav - 0.125, wavs_iag)
-        idx2 = findfirst(x -> x .>= airwav + 0.125, wavs_iag)
-        iag_depth = 1.0 - minimum(view(flux_iag, idx1:idx2))
+        idxl = findfirst(x -> x .>= airwav - 0.125, wavs_iag)
+        idxr = findfirst(x -> x .>= airwav + 0.125, wavs_iag)
+        iag_depth = 1.0 - minimum(view(flux_iag, idxl:idxr))
 
         # set up for GRASS spectrum simulation
         function depth_diff(x)
@@ -199,14 +199,10 @@ function main()
                                                 verbose=false, seed_rng=true)
         flux_sim = dropdims(mean(flux_sim, dims=2), dims=2)
 
-        plt.plot(wavs_sim, flux_sim)
-        plt.plot(wavs_iag, flux_iag)
-        plt.plot(view(wavs_iag, idx1:idx2), view(flux_iag, idx1:idx2))
-        plt.show()
-        continue
-
         # get bisector for IAG and synthetic spectra
-        bis_iag, int_iag = GRASS.calc_bisector(wavs_iag, flux_iag, nflux=50, top=0.9)
+        bis_iag, int_iag = GRASS.calc_bisector(view(wavs_iag, idxl:idxr),
+                                               view(flux_iag, idxl:idxr),
+                                               nflux=50, top=0.9)
         bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=50, top=0.9)
 
         # convert wavelengths to vel grids
@@ -241,13 +237,19 @@ function main()
         flux_iag = itp.(wavs_sim)
         wavs_iag = copy(wavs_sim)
 
+        # re-compute line isolation indices because of interpolation
+        idxl = findfirst(x -> x .>= airwav - 0.125, wavs_iag)
+        idxr = findfirst(x -> x .>= airwav + 0.125, wavs_iag)
+
         # clean the IAG spectrum
         flux_mod = model_iag_blends(wavs_sim, flux_sim, wavs_iag, flux_iag, plot=false)
         mod_depth = 1.0 - minimum(flux_mod)
 
         # recompute bisectors b/c of interpolation
         bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=50, top=0.9)
-        bis_iag, int_iag = GRASS.calc_bisector(wavs_iag, flux_iag, nflux=50, top=0.9)
+        bis_iag, int_iag = GRASS.calc_bisector(view(wavs_iag, idxl:idxr),
+                                               view(flux_iag, idxl:idxr),
+                                               nflux=50, top=0.9)
         bis_mod, int_mod = GRASS.calc_bisector(wavs_iag, flux_mod, nflux=50, top=0.9)
 
         # transform bisectors to velocities
