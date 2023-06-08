@@ -4,6 +4,7 @@ using CSV
 using CUDA
 using GRASS
 using Peaks
+using Optim
 using LsqFit
 using Statistics
 using DataFrames
@@ -47,7 +48,7 @@ function model_iag_blends(wavs_sim::AbstractArray{T,1}, flux_sim::AbstractArray{
 
     # identify peaks in the residuals
     max_resid = 0.01
-    minprom = 0.0005
+    minprom = 0.001
 
     # guess the number of fits needed from minima
     m_inds = Peaks.argmaxima(.-resids, 10, strict=false)
@@ -144,37 +145,29 @@ function main()
         iag_depth = 1.0 - minimum(view(flux_iag, idx1:idx2))
 
         # set up for GRASS spectrum simulation
-        function calculate_ideal_depth()
-            dep_iter = true
-            iters = 0
-            while dep_iter
-                # simulate the spectrum
-                lines = [airwav]
-                depths = [iag_depth - 0.05 + iters * 0.0005]
-                templates = [file]
-                resolution = 1e6
-                spec = SpecParams(lines=lines, depths=depths, templates=templates, resolution=resolution)
-                disk = DiskParams(N=132, Nt=5)
+        function depth_diff(x)
+            # set up params from spectrum
+            lines = [airwav]
+            depths = x
+            templates = [file]
+            resolution = 7e5
+            disk = DiskParams(N=132, Nt=5)
+            spec = SpecParams(lines=lines, depths=depths, templates=templates, resolution=resolution)
 
-                # simulate the spectrum
-                wavs_sim, flux_sim = synthesize_spectra(spec, disk, use_gpu=use_gpu, verbose=false)
-                flux_sim = dropdims(mean(flux_sim, dims=2), dims=2)
-
-                # get the depth difference
-                dep_diff = (1.0 - minimum(flux_sim)) - iag_depth
-                if (abs(dep_diff) < 0.001) | (dep_diff > 0.0)
-                    dep_iter = false
-                    return depths[1]
-                end
-                iters += 1
-            end
+            # simulate the spectrum
+            wavs_sim, flux_sim = synthesize_spectra(spec, disk, use_gpu=use_gpu,
+                                                    verbose=false, seed_rng=true)
+            flux_sim = dropdims(mean(flux_sim, dims=2), dims=2)
+            return abs((1.0 - minimum(flux_sim)) - iag_depth)
         end
 
-        # get the depth
-        # sim_depth = 0.760858156406211
-        sim_depth = 0.8582716997283104
-        println("\t>>> Calculating ideal depth for line synthesis...")
-        # sim_depth = calculate_ideal_depth()
+        # get the depth for the simulation
+        println("\t>>> Calculating optim depth for line synthesis...")
+        lower = [0.0]
+        upper = [1.0]
+        inner_optimizer = GradientDescent()
+        results = optimize(depth_diff, lower, upper, [iag_depth], Fminbox(inner_optimizer))
+        sim_depth = results.minimizer[1]
         println("\t>>> Ideal depth = " * string(sim_depth))
 
         # simulate the spectrum
@@ -187,7 +180,8 @@ function main()
         disk = DiskParams(N=132, Nt=50)
 
         # simulate the spectrum
-        wavs_sim, flux_sim = synthesize_spectra(spec, disk, use_gpu=use_gpu, verbose=false)
+        wavs_sim, flux_sim = synthesize_spectra(spec, disk, use_gpu=use_gpu,
+                                                verbose=false, seed_rng=true)
         flux_sim = dropdims(mean(flux_sim, dims=2), dims=2)
 
         # get bisector for IAG and synthetic spectra
@@ -200,7 +194,7 @@ function main()
 
         # compute velocity as mean bisector between N and M % depth
         N = 0.25
-        M = 0.50
+        M = 0.75
         idx1 = findfirst(x -> x .>= N * iag_depth + minimum(flux_iag), int_iag)
         idx2 = findfirst(x -> x .>= M * iag_depth + minimum(flux_iag), int_iag)
         rv_iag = mean(view(vel_iag, idx1:idx2))
@@ -235,6 +229,8 @@ function main()
         vel_mod = GRASS.c_ms .* (bis_mod .- airwav) ./ (airwav)
 
         # find mean velocities in order to align bisectors
+        N = 0.25
+        M = 0.50
         idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim)
         idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim)
         rv_sim = mean(view(vel_sim, idx1:idx2))
@@ -247,7 +243,7 @@ function main()
         idx2 = findfirst(x -> x .>= M * mod_depth + minimum(flux_mod), int_mod)
         rv_mod = mean(view(vel_mod, idx1:idx2))
 
-        # zero the velocities to talign bisectors
+        # align the bisectors
         vel_sim .-= rv_sim
         vel_iag .-= rv_iag
         vel_mod .-= rv_mod
@@ -280,7 +276,7 @@ function main()
             ax1.set_xticklabels([])
             ax1.set_ylabel(L"{\rm Normalized\ Flux}", labelpad=10)
             ax2.set_xlabel(L"{\rm Wavelength\ (\AA)}")
-            ax2.set_ylabel(L"{\rm IAG\ -\ Synthetic}")
+            ax2.set_ylabel(L"{\rm IAG\ -\ GRASS}")
             ax1.legend()
             fig.tight_layout()
 
@@ -311,11 +307,11 @@ function main()
             ax2.yaxis.tick_right()
             # ax1.set_xlim(5434.4, 5434.6)
             ax1.set_ylim(0.1, 1.1)
-            ax2.set_xlim(-20, 20)
+            ax2.set_xlim(-35, 35)
             ax2.set_ylim(0.1, 1.1)
-            ax1.set_xlabel(L"{\rm Relative\ Velocity\ (ms^{-1})}")
+            ax1.set_xlabel(L"{\rm Relative\ Velocity\ (ms^{-1})}", fontsize=12)
             ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
-            ax2.set_xlabel(L"{\rm IAG\ -\ Synthetic\ (ms^{-1})}")
+            ax2.set_xlabel(L"{\rm IAG\ -\ GRASS\ (ms^{-1})}", fontsize=12)
             ax1.legend(loc="upper right", prop=Dict("size"=>10), labelspacing=0.25)
 
             # set the title
