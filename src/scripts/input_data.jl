@@ -89,6 +89,7 @@ function plot_input_spectra(line_name::String, line_info::DataFrame; highlight::
     ax1.set_xlabel(L"{\rm Wavelength\ (\AA)}")
     ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
     fig.savefig(plotdir * "input_plots/" * line_name * "_spectrum.pdf")
+    plt.show()
     plt.clf(); plt.close()
     return nothing
 end

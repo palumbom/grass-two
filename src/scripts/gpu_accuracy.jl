@@ -41,14 +41,22 @@ wavs_gpu64, flux_gpu64 = synthesize_spectra(spec, disk, seed_rng=true, verbose=t
 println(">>> Doing GPU synthesis (single precision)...")
 wavs_gpu32, flux_gpu32 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true, precision=Float32)
 
-# compute means
-flux_cpu_mean64 = flux_cpu64[:,1]
-flux_gpu_mean64 = flux_gpu64[:,1]
-flux_gpu_mean32 = flux_gpu32[:,1]
+# slice output
+flux_cpu64 = flux_cpu64[:,1]
+flux_gpu64 = flux_gpu64[:,1]
+flux_gpu32 = flux_gpu32[:,1]
+
+# write to disk
+# outfile = "gpu_accuracy.jld2"
+# jldsave(outfile,
+#         wavs_cpu64=wavs_cpu64, flux_cpu64=flux_cpu64,
+#         wavs_gpu64=wavs_cpu64, flux_gpu64=flux_cpu64,
+#         wavs_gpu32=wavs_cpu64, flux_gpu32=flux_cpu64)
+# println(">>> Data written to: " * outfile)
 
 # get flux residuals
-resids64 = flux_cpu_mean64 .- flux_gpu_mean64
-resids32 = flux_cpu_mean64 .- flux_gpu_mean32
+resids64 = flux_cpu64 .- flux_gpu64
+resids32 = flux_cpu64 .- flux_gpu32
 
 @show maximum(abs.(resids64))
 @show maximum(abs.(resids32))
@@ -78,11 +86,11 @@ v_resid32 = rvs_cpu64 - rvs_gpu32
 fig, (ax1, ax2, ax3) = plt.subplots(nrows=3, ncols=1, figsize=(7,9.5), sharex=true)
 
 ms = 2.0
-ax1.plot(wavs_cpu64, flux_cpu_mean64, ls="-", c="k", ms=ms, lw=3.0, label=L"{\rm CPU\ (Float64)}", zorder=0)
+ax1.plot(wavs_cpu64, flux_cpu64, ls="-", c="k", ms=ms, lw=3.0, label=L"{\rm CPU\ (Float64)}", zorder=0)
 # ax1.plot(wavs_gpu64, flux_gpu_mean64, ls="--", c=colors[1], ms=ms, label=L"{\rm GPU\ (Float64)}")
-ax1.scatter(wavs_gpu64, flux_gpu_mean64, marker="s", alpha=0.75, c=colors[1], s=3.0, label=L"{\rm GPU\ (Float64)}", zorder=1)
+ax1.scatter(wavs_gpu64, flux_gpu64, marker="s", alpha=0.75, c=colors[1], s=3.0, label=L"{\rm GPU\ (Float64)}", zorder=1)
 # ax1.plot(wavs_gpu32, flux_gpu_mean32, ls=":", c=colors[2], ms=ms, label=L"{\rm GPU\ (Float32)}")
-ax1.scatter(wavs_gpu32, flux_gpu_mean32, marker="^", alpha=0.75, c=colors[2], s=3.0, label=L"{\rm GPU\ (Float32)}", zorder=2)
+ax1.scatter(wavs_gpu32, flux_gpu32, marker="^", alpha=0.75, c=colors[2], s=3.0, label=L"{\rm GPU\ (Float32)}", zorder=2)
 ax2.scatter(wavs_cpu64, resids64, s=5, marker="s", c=colors[1], alpha=0.9)
 ax3.scatter(wavs_cpu64, resids32, s=5, marker="^", c=colors[2], alpha=0.9)
 
@@ -111,8 +119,8 @@ ax3_histy.grid(false)
 
 ax1.set_xlim(minimum(wavs_cpu64)-0.1, maximum(wavs_cpu64)+0.1)
 ax1.set_ylim(0.15, 1.05)
-ax2.set_ylim(-1.2e-14, 1.2e-14)
-ax3.set_ylim(-1.2e-3, 1.2e-3)
+ax2.set_ylim(-1.5e-14, 1.5e-14)
+ax3.set_ylim(-1.5e-3, 1.5e-3)
 
 # do manual formatting of tick labels since the default is ROUGH
 ax2.ticklabel_format(axis="y", useOffset=true, style="sci")
