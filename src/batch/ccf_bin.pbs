@@ -17,6 +17,6 @@ echo "Job id: $PBS_JOBID"
 echo "About to change into $PBS_O_WORKDIR"
 cd $PBS_O_WORKDIR
 echo "About to start Julia"
-julia /storage/home/mlp95/work/grass-two/src/scripts/ccf_bin.jl
+julia src/scripts/ccf_bin.jl
 echo "Julia exited"
 date

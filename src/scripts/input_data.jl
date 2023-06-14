@@ -211,12 +211,12 @@ end
     end
 
     # sort on wavmin indices
-    idx = sortperm(wavmins)
-    wavmins .= wavmins[idx]
-    fluxmins .= fluxmins[idx]
-    wavmaxs .= wavmaxs[idx]
-    fluxmaxs .= fluxmaxs[idx]
-    dirs .= dirs[idx]
+    idx0 = sortperm(wavmins)
+    wavmins .= wavmins[idx0]
+    fluxmins .= fluxmins[idx0]
+    wavmaxs .= wavmaxs[idx0]
+    fluxmaxs .= fluxmaxs[idx0]
+    dirs .= dirs[idx0]
 
     # get width of wavelength regions
     wav_wids = wavmaxs .- wavmins
@@ -281,24 +281,42 @@ end
             min = argmin(spec2[idx2-50:idx2+50]) + idx2 - 50
 
             # set rotation
-            if isapprox(airwav_ann[j], 5896, atol=1e0)
+            if contains(names_ann[j], "5896")
                 rotation = 0.0
                 x1 = 0.0
                 x2 = 0.0
                 y1 = 0.025
                 y2 = 0.1
-            elseif isapprox(airwav_ann[j], 5250.6, atol=1e-1)
+            elseif contains(names_ann[j], "5250.6")
                 rotation = 270.0
                 x1 = -0.15
                 x2 = -0.4
                 y1 = 0.015
                 y2 = 0.22
-            elseif isapprox(airwav_ann[j], 5436.6, atol=1e-1)
+            elseif contains(names_ann[j], "NiI_5435")
+                rotation = 270.0
+                x1 = 0.0
+                x2 = 0.0
+                y1 = 0.015
+                y2 = 0.28
+            elseif contains(names_ann[j], "5436.3")
+                rotation = 270.0
+                x1 = 0.0
+                x2 = 0.0
+                y1 = 0.015
+                y2 = 0.235
+            elseif contains(names_ann[j], "5436.6")
                 rotation = 270.0
                 x1 = -0.15
                 x2 = -0.4
                 y1 = 0.015
                 y2 = 0.22
+            elseif contains(names_ann[j], "6169")
+                rotation = 270.0
+                x1 = 0.0
+                x2 = 0.0
+                y1 = 0.015
+                y2 = 0.25
             else
                 rotation = 270.0
                 x1 = 0.0
@@ -309,10 +327,29 @@ end
 
             # annotate with line name
             arrowprops = Dict("facecolor"=>"black", "lw"=>1.5, "arrowstyle"=>"-")
-            txt = axs[i].annotate(("\${\\rm " * replace(names_ann[j], "_" => "\\ ") * "}\$"), rotation=rotation,
-                                  (wavs2[min] - x1, spec2[min] - y1), (wavs2[min] - x2, spec2[min] - y2),
-                                  arrowprops=arrowprops, horizontalalignment="center", fontsize=14)
+            if (contains(names_ann[j], "5896") | contains(names_ann[j], "5380"))
+                title = replace(names_ann[j], "_" => "\\ ")
+                idx = findfirst('I', title)
+                title = title[1:idx-1] * "\\ " * title[idx:end]
+                title = ("\$^\\ddagger{\\rm " * title * "}\$")
+            else
+                title = replace(names_ann[j], "_" => "\\ ")
+                idx = findfirst('I', title)
+                title = title[1:idx-1] * "\\ " * title[idx:end]
+                title = ("\${\\rm " * title * "}\$")
+            end
+            txt = axs[i].annotate(title, rotation=rotation,
+                                  (wavs2[min] - x1, spec2[min] - y1),
+                                  (wavs2[min] - x2, spec2[min] - y2),
+                                  horizontalalignment="center", arrowprops=arrowprops,
+                                  fontsize=14)
             push!(texts, txt)
+
+            # arrowprops = Dict("facecolor"=>"black", "lw"=>1.5, "arrowstyle"=>"-")
+            # txt = axs[i].annotate(("\${\\rm " * replace(names_ann[j], "_" => "\\ ") * "}\$"), rotation=rotation,
+            #                       (wavs2[min] - x1, spec2[min] - y1), (wavs2[min] - x2, spec2[min] - y2),
+            #                       arrowprops=arrowprops, horizontalalignment="center", fontsize=14)
+            # push!(texts, txt)
         end
 
         # d = 0.5

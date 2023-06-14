@@ -135,10 +135,10 @@ function main()
 
     # wavelength of line to synthesize/compare to iag
     for (i, file) in enumerate(files)
-        # if !contains(file, "FeI_6301")
+        # if !contains(file, "NaI_5896")
         #     continue
         # end
-        # i < 22 && continue
+        # i < 13 && continue
         println(">>> Running " * line_names[i] * "...")
 
         # get properties from line
@@ -181,10 +181,10 @@ function main()
         lb = [0.0]
         ub = [1.0]
         optimizer = Fminbox(GradientDescent())
-        options = Optim.Options(outer_f_abstol=1e-3, outer_iterations=50)
+        options = Optim.Options(f_abstol=1e-3, outer_f_abstol=1e-3, iterations=50, outer_iterations=50)
         results = optimize(depth_diff, lb, ub, [iag_depth], optimizer, options)
         sim_depth = results.minimizer[1]
-    println("\t>>> Optimized depth = " * string(sim_depth))
+        println("\t>>> Optimized depth = " * string(sim_depth))
 
         # simulate the spectrum
         lines = [airwav]
@@ -202,8 +202,8 @@ function main()
 
         # get bisector for IAG and synthetic spectra
         bis_iag, int_iag = GRASS.calc_bisector(view(wavs_iag, idxl:idxr),
-                                                     view(flux_iag, idxl:idxr),
-                                                     nflux=50, top=0.9)
+                                               view(flux_iag, idxl:idxr),
+                                               nflux=50, top=0.9)
         bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=50, top=0.9)
 
         # convert wavelengths to vel grids
@@ -211,7 +211,7 @@ function main()
         vel_sim = GRASS.c_ms .* (bis_sim .- airwav) ./ (airwav)
 
         # compute velocity as mean bisector between N and M % depth
-        N = 0.25
+        N = 0.1
         M = 0.75
         idx1 = findfirst(x -> x .>= N * iag_depth + iag_bot, int_iag)
         idx2 = findfirst(x -> x .>= M * iag_depth + iag_bot, int_iag)
@@ -248,8 +248,8 @@ function main()
         # recompute bisectors b/c of interpolation
         bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=50, top=0.9)
         bis_iag, int_iag = GRASS.calc_bisector(view(wavs_iag, idxl:idxr),
-                                                     view(flux_iag, idxl:idxr),
-                                                     nflux=50, top=0.9)
+                                               view(flux_iag, idxl:idxr),
+                                               nflux=50, top=0.9)
         # bis_mod, int_mod = GRASS.calc_bisector(wavs_iag, flux_mod, nflux=50, top=0.9)
 
         # transform bisectors to velocities
@@ -292,7 +292,7 @@ function main()
         # big function for plotting
         function comparison_plots()
             # make plot objects
-            fig = plt.figure()
+            fig = plt.figure(figsize=(6.4,4.8))
             gs = mpl.gridspec.GridSpec(nrows=2, ncols=1, height_ratios=[2, 1], figure=fig, hspace=0.05)
             ax1 = fig.add_subplot(gs[1])
             ax2 = fig.add_subplot(gs[2])
@@ -322,7 +322,10 @@ function main()
             fig.tight_layout()
 
             # set the title
-            ax1.set_title(("\${\\rm " * replace(line_name, "_" => "\\ ") * "}\$"))
+            title = replace(line_name, "_" => "\\ ")
+            idx = findfirst('I', title)
+            title = title[1:idx-1] * "\\ " * title[idx:end] * "\\ \\AA"
+            ax1.set_title(("\${\\rm " * title * "}\$"))
 
             # save the plot
             fig.subplots_adjust(wspace=0.05)
@@ -330,18 +333,18 @@ function main()
             plt.clf(); plt.close()
 
             # plot the bisectors
-            fig = plt.figure()
+            fig = plt.figure(figsize=(6.4,4.8))
             gs = mpl.gridspec.GridSpec(nrows=1, ncols=2, width_ratios=[2, 1.1], figure=fig, wspace=0.05)
             ax1 = fig.add_subplot(gs[1])
             ax2 = fig.add_subplot(gs[2])
 
             # plot bisectors
-            ax1.plot(vel_sim[4:end], int_sim[4:end], marker="o", color="black", ms=3.0, lw=2.0, markevery=2, label=L"{\rm Synthetic}")
-            ax1.plot(vel_iag[4:end], int_iag[4:end], marker="s", c=colors[1], ms=2.0, lw=1.0, markevery=2, label=L"{\rm IAG}")
-            # ax1.plot(vel_mod[2:end], int_mod[2:end], marker="^", c=colors[2], ms=2.0, lw=1.0, markevery=2, label=L"{\rm Cleaned\ IAG}")
+            ax1.plot(vel_sim[4:end], int_sim[4:end], marker="o", color="black", ms=3.0, lw=2.0, markevery=1, label=L"{\rm Synthetic}")
+            ax1.plot(vel_iag[4:end], int_iag[4:end], marker="s", c=colors[1], ms=2.0, lw=1.0, markevery=1, label=L"{\rm IAG}")
+            # ax1.plot(vel_mod[2:end], int_mod[2:end], marker="^", c=colors[2], ms=2.0, lw=1.0, markevery=1, label=L"{\rm Cleaned\ IAG}")
 
             # plot residuals
-            ax2.plot(vel_iag[4:end] .- vel_sim[4:end], int_iag[4:end], c=colors[1], marker="s", ms=2.0, lw=0.0, markevery=2)
+            ax2.plot(vel_iag[4:end] .- vel_sim[4:end], int_iag[4:end], c=colors[1], marker="s", ms=2.0, lw=0.0, markevery=1)
             # ax2.plot(vel_mod[2:end] .- vel_sim[2:end], int_mod[2:end], c=colors[2], marker="o", ms=2.0, lw=0.0, markevery=2)
 
             # set tick labels, axis labels, etc.
@@ -353,10 +356,10 @@ function main()
             ax1.set_xlabel(L"{\rm Relative\ Velocity\ (ms^{-1})}", fontsize=12)
             ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
             ax2.set_xlabel(L"{\rm IAG\ -\ GRASS\ (ms^{-1})}", fontsize=12)
-            ax1.legend(loc="upper right", prop=Dict("size"=>10), labelspacing=0.25)
+            ax1.legend(loc="upper right", prop=Dict("size"=>12), labelspacing=0.25)
 
             # set the title
-            fig.suptitle(("\${\\rm " * replace(line_name, "_" => "\\ ") * "}\$"))
+            fig.suptitle(("\${\\rm " * title * "}\$"), y=0.95)
 
             # save the plot
             fig.subplots_adjust(hspace=0.05)
