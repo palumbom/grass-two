@@ -10,7 +10,7 @@ using BenchmarkTools
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
-const outfile = joinpath(data, "benchmark.jld2")
+const datafile = string(abspath(joinpath(data, "benchmark.jld2")))
 
 function benchmark_cpu(spec::SpecParams, disk::DiskParams)
     lambdas1, outspec1 = synthesize_spectra(spec, disk, verbose=false, seed_rng=true)
@@ -101,7 +101,7 @@ function main()
     bmark_everything(b_cpu, b_gpu, b_gpu32, lines, depths, max_cpu=max_cpu)
 
     # write results to disk
-    save(outfile,
+    save(datafile,
          "max_cpu", max_cpu,
          "nlines", nlines,
          "n_res", n_res,

@@ -13,7 +13,7 @@ using HypothesisTests
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
-const outfile = joinpath(data, "gpu_accuracy.jld2")
+const datafile = string(abspath(joinpath(data, "gpu_accuracy.jld2")))
 
 # set up paramaters for spectrum
 lines = [5500.0, 5500.85, 5501.4, 5502.20, 5502.5, 5503.05]
@@ -41,7 +41,7 @@ flux_gpu64 = flux_gpu64[:,1]
 flux_gpu32 = flux_gpu32[:,1]
 
 # write to disk
-jldsave(outfile,
+jldsave(datafile,
         wavs_cpu64=wavs_cpu64, flux_cpu64=flux_cpu64,
         wavs_gpu64=wavs_cpu64, flux_gpu64=flux_cpu64,
         wavs_gpu32=wavs_cpu64, flux_gpu32=flux_cpu64)

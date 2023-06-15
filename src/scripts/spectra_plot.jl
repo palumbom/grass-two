@@ -14,9 +14,6 @@ adjust_text = pyimport("adjustText")
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
 
-# set LARS spectra absolute dir and read line info file
-const data_dir = "/storage/group/ebf11/default/mlp95/lars_spectra/"
-
 # get summary of present line atomic params etc.
 lp = LineProperties(exclude=[""])
 files = lp.file
@@ -210,5 +207,6 @@ fig.supxlabel(L"{\rm Wavelength\ (\AA)}", y=-0.01, fontsize=21)
 fig.supylabel(L"{\rm Normalized\ Flux}", x=0.09, fontsize=21)
 
 # save the fig
-fig.savefig(joinpath(static, "spectra_collage.pdf"))
+plotfile = string(abspath(joinpath(static, "spectra_collage.pdf")))
+fig.savefig(plotfile)
 plt.clf(); plt.close()

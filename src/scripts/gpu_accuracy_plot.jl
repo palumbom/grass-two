@@ -19,10 +19,11 @@ colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
-const outfile = joinpath(data, "benchmark.jld2")
+const datafile = string(abspath(joinpath(data, "gpu_accuracy.jld2.jld2")))
+const plotfile = string(abspath(joinpath(figures, "gpu_accuracy.pdf")))
 
 # read in the data
-d = load(outfile)
+d = load(datafile)
 wavs_cpu64 = d["wavs_cpu64"]
 flux_cpu64 = d["flux_cpu64"]
 wavs_gpu64 = d["wavs_gpu64"]
@@ -121,5 +122,5 @@ ax3.set_xlabel(L"{\rm Wavelength\ (\AA)}")
 
 fig.tight_layout()
 fig.subplots_adjust(hspace=0.05)
-fig.savefig(joinpath(figures, "gpu_accuracy.pdf"))
+fig.savefig(plotfile)
 plt.clf(); plt.close()

@@ -16,10 +16,10 @@ colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
-const outfile = joinpath(data, "benchmark.jld2")
+const datafile = string(abspath(joinpath(data, "benchmark.jld2")))
 
 # read in the data
-d = load(outfile)
+d = load(datafile)
 max_cpu = d["max_cpu"]
 nlines = d["nlines"]
 n_res = d["n_res"]
@@ -86,5 +86,7 @@ function plot_scaling(filename; logscale=true)
 end
 
 # plot it
-plot_scaling(joinpath(figures, "scaling_bench_logscale.pdf"), logscale=true)
-plot_scaling(joinpath(figures, "scaling_bench_linscale.pdf"), logscale=false)
+plotfile1 = string(abspath(joinpath(figures, "scaling_bench_logscale.pdf")))
+plotfile2 = string(abspath(joinpath(figures, "scaling_bench_linscale.pdf")))
+plot_scaling(plotfile1, logscale=true)
+plot_scaling(plotfile2, logscale=false)
