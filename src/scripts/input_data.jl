@@ -1,9 +1,9 @@
 # imports
 using CSV
-using DataFrames
-using Statistics
 using GRASS
 using PyCall
+using DataFrames
+using Statistics
 
 # plotting imports
 import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
@@ -12,8 +12,7 @@ mpl.style.use(joinpath(GRASS.moddir, "fig.mplstyle"))
 adjust_text = pyimport("adjustText")
 
 # get command line args and output directories
-run, plot = parse_args(ARGS)
-grassdir, plotdir, datadir = check_plot_dirs()
+include(joinpath(abspath(@__DIR__), "paths.jl"))
 
 # set LARS spectra absolute dir and read line info file
 const data_dir = "/storage/group/ebf11/default/mlp95/lars_spectra/"
