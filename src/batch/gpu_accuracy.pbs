@@ -9,7 +9,7 @@
 #PBS -j oe
 #PBS -o /storage/home/mlp95/work/logs/
 #PBS -e /storage/home/mlp95/work/logs/
-#PBS -N GRASS_scaling
+#PBS -N GRASS_accuracy
 
 echo "Starting job $PBS_JOBNAME"
 date
