@@ -1,4 +1,4 @@
-using Pkg; Pkg.activate(".")
+# imports
 using JLD2
 using CUDA
 using GRASS
@@ -17,42 +17,18 @@ import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
 mpl.style.use(GRASS.moddir * "fig.mplstyle")
 colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
-# parse args + get directories
-run, plot = parse_args(ARGS)
-grassdir, plotdir, datadir = check_plot_dirs()
+# get command line args and output directories
+include(joinpath(abspath(@__DIR__), "paths.jl"))
+const outfile = joinpath(data, "benchmark.jld2")
 
-# set up paramaters for spectrum
-lines = [5500.0, 5500.85, 5501.4, 5502.20, 5502.5, 5503.05]
-depths = [0.75, 0.4, 0.65, 0.55, 0.25, 0.7]
-templates = ["FeI_5434", "FeI_5576", "FeI_6173", "FeI_5432", "FeI_5576", "FeI_5250.6"]
-resolution = 7e5
-buffer = 0.6
-
-# create composite types
-disk = DiskParams(N=132, Nt=5)
-spec = SpecParams(lines=lines, depths=depths, templates=templates,
-                  resolution=resolution, buffer=buffer)
-
-# get the spectra
-println(">>> Doing CPU synthesis...")
-wavs_cpu64, flux_cpu64 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=false)
-println(">>> Doing GPU synthesis (double precision)...")
-wavs_gpu64, flux_gpu64 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true)
-println(">>> Doing GPU synthesis (single precision)...")
-wavs_gpu32, flux_gpu32 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true, precision=Float32)
-
-# slice output
-flux_cpu64 = flux_cpu64[:,1]
-flux_gpu64 = flux_gpu64[:,1]
-flux_gpu32 = flux_gpu32[:,1]
-
-# write to disk
-# outfile = "gpu_accuracy.jld2"
-# jldsave(outfile,
-#         wavs_cpu64=wavs_cpu64, flux_cpu64=flux_cpu64,
-#         wavs_gpu64=wavs_cpu64, flux_gpu64=flux_cpu64,
-#         wavs_gpu32=wavs_cpu64, flux_gpu32=flux_cpu64)
-# println(">>> Data written to: " * outfile)
+# read in the data
+d = load(outfile)
+wavs_cpu64 = d["wavs_cpu64"]
+flux_cpu64 = d["flux_cpu64"]
+wavs_gpu64 = d["wavs_gpu64"]
+flux_gpu64 = d["flux_gpu64"]
+wavs_gpu32 = d["wavs_gpu32"]
+flux_gpu32 = d["flux_gpu32"]
 
 # get flux residuals
 resids64 = flux_cpu64 .- flux_gpu64
@@ -145,5 +121,5 @@ ax3.set_xlabel(L"{\rm Wavelength\ (\AA)}")
 
 fig.tight_layout()
 fig.subplots_adjust(hspace=0.05)
-fig.savefig(joinpath(plotdir, "gpu_accuracy.pdf"))
+fig.savefig(joinpath(figures, "gpu_accuracy.pdf"))
 plt.clf(); plt.close()

@@ -1,0 +1,47 @@
+# imports
+using JLD2
+using CUDA
+using GRASS
+using Printf
+using FileIO
+using Revise
+using Statistics
+using EchelleCCFs
+using Distributions
+using BenchmarkTools
+using HypothesisTests
+
+# get command line args and output directories
+include(joinpath(abspath(@__DIR__), "paths.jl"))
+const outfile = joinpath(data, "gpu_accuracy.jld2")
+
+# set up paramaters for spectrum
+lines = [5500.0, 5500.85, 5501.4, 5502.20, 5502.5, 5503.05]
+depths = [0.75, 0.4, 0.65, 0.55, 0.25, 0.7]
+templates = ["FeI_5434", "FeI_5576", "FeI_6173", "FeI_5432", "FeI_5576", "FeI_5250.6"]
+resolution = 7e5
+buffer = 0.6
+
+# create composite types
+disk = DiskParams(N=132, Nt=5)
+spec = SpecParams(lines=lines, depths=depths, templates=templates,
+                  resolution=resolution, buffer=buffer)
+
+# get the spectra
+println(">>> Doing CPU synthesis...")
+wavs_cpu64, flux_cpu64 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=false)
+println(">>> Doing GPU synthesis (double precision)...")
+wavs_gpu64, flux_gpu64 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true)
+println(">>> Doing GPU synthesis (single precision)...")
+wavs_gpu32, flux_gpu32 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true, precision=Float32)
+
+# slice output
+flux_cpu64 = flux_cpu64[:,1]
+flux_gpu64 = flux_gpu64[:,1]
+flux_gpu32 = flux_gpu32[:,1]
+
+# write to disk
+jldsave(outfile,
+        wavs_cpu64=wavs_cpu64, flux_cpu64=flux_cpu64,
+        wavs_gpu64=wavs_cpu64, flux_gpu64=flux_cpu64,
+        wavs_gpu32=wavs_cpu64, flux_gpu32=flux_cpu64)
