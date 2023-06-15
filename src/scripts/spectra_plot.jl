@@ -94,7 +94,8 @@ for i in eachindex(dirs)
     # set the xlimits
     axs[i].set_xlim(minimum(wavs2) - 0.5, maximum(wavs2) + 0.5)
     axs[i].set_ylim(-0.1, 1.075)
-    # axs[i].set_box_aspect(0.5)
+
+    # axs[i].axvline(maximum(wavs2) + 0.5, ls="--", c="red")
 
     # axs[i].grid(false)
 

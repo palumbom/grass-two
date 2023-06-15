@@ -12,16 +12,16 @@ rule julia_manifest:
     output: "Manifest.toml"
     shell: "julia -e 'using Pkg; Pkg.instantiate()'"
 
-rule data:
+rule gpu_accuracy_data:
     input: "Manifest.toml"
-    output: "src/data/mydata.csv"
-    script: "src/scripts/data.jl"
+    output: "src/data/gpu_accuracy.jld2"
+    script: "src/scripts/gpu_accuracy_data.jl"
 
-rule plot:
+rule gpu_accuracy_data:
     input:
         "Manifest.toml",
-        data="src/data/mydata.csv",
+        data="src/data/gpu_accuracy.jld2",
         # ^ Can name these for easier reference in the script.
         # https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#julia
-    output: "src/tex/figures/myplot.png"
-    script: "src/scripts/plot.jl"
+    output: "src/tex/figures/gpu_accuracy.pdf"
+    script: "src/scripts/gpu_accuracy_plot.jl"

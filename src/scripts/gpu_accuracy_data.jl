@@ -9,7 +9,6 @@ using Statistics
 using EchelleCCFs
 using Distributions
 using BenchmarkTools
-using HypothesisTests
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
@@ -40,8 +39,35 @@ flux_cpu64 = flux_cpu64[:,1]
 flux_gpu64 = flux_gpu64[:,1]
 flux_gpu32 = flux_gpu32[:,1]
 
+# get flux residuals
+resids64 = flux_cpu64 .- flux_gpu64
+resids32 = flux_cpu64 .- flux_gpu32
+
+# compute velocities
+v_grid, ccf1 = calc_ccf(wavs_cpu64, flux_cpu64, spec, normalize=true, mask_type=EchelleCCFs.TopHatCCFMask)
+rvs_cpu64, sigs_cpu64 = calc_rvs_from_ccf(v_grid, ccf1)
+
+v_grid, ccf1 = calc_ccf(wavs_gpu64, flux_gpu64, spec, normalize=true, mask_type=EchelleCCFs.TopHatCCFMask)
+rvs_gpu64, sigs_gpu64 = calc_rvs_from_ccf(v_grid, ccf1)
+
+v_grid, ccf1 = calc_ccf(wavs_gpu32, flux_gpu32, spec, normalize=true, mask_type=EchelleCCFs.TopHatCCFMask)
+rvs_gpu32, sigs_gpu32 = calc_rvs_from_ccf(v_grid, ccf1)
+
+# get velocity residuals
+v_resid64 = rvs_cpu64 - rvs_gpu64
+v_resid32 = rvs_cpu64 - rvs_gpu32
+
+# report some diagnostics
+println()
+@show maximum(abs.(resids64))
+@show maximum(abs.(resids32))
+
+println()
+@show mean(v_resid64)
+@show mean(v_resid32)
+
 # write to disk
-jldsave(datafile,
+jldsave(datafile, resids64=resids64, resids32=resids32,
         wavs_cpu64=wavs_cpu64, flux_cpu64=flux_cpu64,
         wavs_gpu64=wavs_cpu64, flux_gpu64=flux_cpu64,
         wavs_gpu32=wavs_cpu64, flux_gpu32=flux_cpu64)

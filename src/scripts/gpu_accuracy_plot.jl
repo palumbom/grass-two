@@ -9,7 +9,6 @@ using Statistics
 using EchelleCCFs
 using Distributions
 using BenchmarkTools
-using HypothesisTests
 
 # plotting
 using LaTeXStrings
@@ -19,7 +18,7 @@ colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
-const datafile = string(abspath(joinpath(data, "gpu_accuracy.jld2.jld2")))
+const datafile = string(abspath(joinpath(data, "gpu_accuracy.jld2")))
 const plotfile = string(abspath(joinpath(figures, "gpu_accuracy.pdf")))
 
 # read in the data
@@ -30,34 +29,8 @@ wavs_gpu64 = d["wavs_gpu64"]
 flux_gpu64 = d["flux_gpu64"]
 wavs_gpu32 = d["wavs_gpu32"]
 flux_gpu32 = d["flux_gpu32"]
-
-# get flux residuals
-resids64 = flux_cpu64 .- flux_gpu64
-resids32 = flux_cpu64 .- flux_gpu32
-
-@show maximum(abs.(resids64))
-@show maximum(abs.(resids32))
-
-# test residuals for normality
-AD1 = OneSampleADTest(resids64, Normal())
-AD2 = OneSampleADTest(resids32, Normal())
-
-# compute velocities
-v_grid, ccf1 = calc_ccf(wavs_cpu64, flux_cpu64, spec, normalize=true, mask_type=EchelleCCFs.TopHatCCFMask)
-rvs_cpu64, sigs_cpu64 = calc_rvs_from_ccf(v_grid, ccf1)
-
-v_grid, ccf1 = calc_ccf(wavs_gpu64, flux_gpu64, spec, normalize=true, mask_type=EchelleCCFs.TopHatCCFMask)
-rvs_gpu64, sigs_gpu64 = calc_rvs_from_ccf(v_grid, ccf1)
-
-v_grid, ccf1 = calc_ccf(wavs_gpu32, flux_gpu32, spec, normalize=true, mask_type=EchelleCCFs.TopHatCCFMask)
-rvs_gpu32, sigs_gpu32 = calc_rvs_from_ccf(v_grid, ccf1)
-
-# get velocity residuals
-v_resid64 = rvs_cpu64 - rvs_gpu64
-v_resid32 = rvs_cpu64 - rvs_gpu32
-
-@show mean(v_resid64)
-@show mean(v_resid32)
+resids32 = d["resids32"]
+resids64 = d["resids64"]
 
 # set up plot
 fig, (ax1, ax2, ax3) = plt.subplots(nrows=3, ncols=1, figsize=(7,9.5), sharex=true)
