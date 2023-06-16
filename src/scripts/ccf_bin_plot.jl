@@ -17,65 +17,17 @@ using HypothesisTests
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
+const datafile = joinpath(data, "spectra_for_bin.jld2")
 
-# get input data properties
-lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
-line_species = GRASS.get_species(lp)
-rest_wavelengths = GRASS.get_rest_wavelength(lp)
-line_depths = GRASS.get_depth(lp)
-line_names = GRASS.get_name(lp)
-line_titles = replace.(line_names, "_" => " ")
-line_files = GRASS.get_file(lp)
+# read in the data
+d = load(datafile)
+wavs = d["wavs"]
+flux = d["flux"]
+templates = d["templates"]
+lines = d["lines"]
+depths = d["depths"]
 
-# draw random line depths and centers
-nlines = 10
-# lines = Float64[]
-lines = range(5200, 5800, length=nlines*length(rest_wavelengths))
-depths = Float64[]
-templates = String[]
-for i in eachindex(rest_wavelengths)
-    # ltemp = rand(Uniform(minimum(rest_wavelengths), maximum(rest_wavelengths)), nlines)
-    # ltemp = rand(Uniform(5200, 5400), nlines)
-    dtemp = rand(Normal(line_depths[i]-0.05, 0.05), nlines)
-    # push!(lines, ltemp...)
-    push!(depths, dtemp...)
-    push!(templates, repeat([line_files[i]], nlines)...)
-end
-
-# re-shuffle template order by generating random indices
-idx = randperm(length(lines))
-depths = depths[idx]
-templates = templates[idx]
-
-# synthesize a spectrum
-N = 132
-Nt = 1000
-variability = trues(length(lines))
-resolution = 7e5
-seed_rng = true
-
-# do a quick synthesis for precompilation purposes
-disk0 = DiskParams(N=N, Nt=10)
-spec0 = SpecParams(lines=lines[1:2], depths=depths[1:2],
-                   variability=variability[1:2], templates=templates[1:2],
-                   resolution=resolution)
-wavs0, flux0 = synthesize_spectra(spec0, disk0, seed_rng=true, verbose=true, use_gpu=true)
-
-
-# now do the actual synthesis
-disk = DiskParams(N=N, Nt=Nt)
-spec1 = SpecParams(lines=lines, depths=depths, variability=variability, templates=templates, resolution=resolution)
-wavs, flux = synthesize_spectra(spec1, disk, seed_rng=true, verbose=true, use_gpu=true)
-
-# write it to a JLD2
-fout = joinpath(data, "spectra_for_bin.jld2")
-jldsave(fout, wavs=wavs, flux=flux, templates=spec1.templates, lines=spec1.lines, depths=spec1.depths)
-
-
-
-
-
-function make_ccf_plots(wavs, flux, lines, depths, title)
+function make_ccf_plots(wavs, flux, lines, depths, title, filename)
     # calculate a ccf for one line
     v_grid, ccf1 = calc_ccf(wavs, flux, lines, depths,
                             7e5, mask_type=EchelleCCFs.TopHatCCFMask,
@@ -119,20 +71,13 @@ function make_ccf_plots(wavs, flux, lines, depths, title)
     ax2.set_ylabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m s}^{-1}{\rm )}")
     ax2.yaxis.set_label_position("right")
     ax2.yaxis.tick_right()
-    fig.suptitle("{\\rm " * replace(title, " "=> "\\ ") * "}", y=0.98)
+    if !isempty(title)
+        fig.suptitle("{\\rm " * replace(title, " "=> "\\ ") * "}", y=0.98)
+    end
     fig.tight_layout()
-    fig.savefig(joinpath("/Users/michael/Desktop/ccf_bin_plots/", title * ".pdf"))
-    # plt.show()
+    fig.savefig(filename)
     plt.clf(); plt.close()
 end
-
-# load the file
-data = load("/Users/michael/Desktop/spectra_for_bin.jld2")
-depths = data["depths"]
-wavs = data["wavs"]
-lines = data["lines"]
-flux = data["flux"]
-templates = data["templates"]
 
 # collect lines
 lines = collect(lines)
@@ -142,19 +87,20 @@ lines = collect(lines)
 # plt.show()
 
 # do all lines
-# make_ccf_plots(wavs, flux, lines, depths, "All Lines")
+outfile = joinpath(figures, "ccf_bin.pdf")
+make_ccf_plots(wavs, flux, lines, depths, "", outfile)
 
 # do a single line (a nice one)
-idx = findfirst(x -> occursin.("FeI_5250.6", x), templates)
+idx = findfirst(x -> occursin.("FeI_5576", x), templates)
 make_ccf_plots(wavs, flux, [lines[idx]], [depths[idx]], "Single Line")
 
 # now do all lines of a given template
-lp = GRASS.LineProperties()
-line_names = GRASS.get_name(lp)
-for i in line_names
-    idx = findall(x -> occursin.(i, x), templates)
-    make_ccf_plots(wavs, flux, lines[idx], depths[idx], i)
-end
+# lp = GRASS.LineProperties()
+# line_names = GRASS.get_name(lp)
+# for i in line_names
+#     idx = findall(x -> occursin.(i, x), templates)
+#     make_ccf_plots(wavs, flux, lines[idx], depths[idx], i)
+# end
 
 # # get list of line idxs in each depth bin
 # depth_bins = range(0.0, 1.0, step=0.1)
