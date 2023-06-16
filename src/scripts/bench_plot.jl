@@ -85,8 +85,10 @@ function plot_scaling(filename; logscale=true)
     return nothing
 end
 
-# plot it
+# plot it on logscale
 plotfile1 = string(abspath(joinpath(figures, "scaling_bench_logscale.pdf")))
-plotfile2 = string(abspath(joinpath(figures, "scaling_bench_linscale.pdf")))
 plot_scaling(plotfile1, logscale=true)
-plot_scaling(plotfile2, logscale=false)
+
+# plot it on linscale
+# plotfile2 = string(abspath(joinpath(figures, "scaling_bench_linscale.pdf")))
+# plot_scaling(plotfile2, logscale=false)

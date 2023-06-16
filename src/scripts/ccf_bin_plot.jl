@@ -6,28 +6,22 @@ using GRASS
 using Printf
 using Revise
 using FileIO
-using Random
 using DataFrames
 using Statistics
 using EchelleCCFs
 using Polynomials
-using Distributions
-using BenchmarkTools
-using HypothesisTests
+
+# plotting
+using LaTeXStrings
+import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
+mpl.style.use(GRASS.moddir * "fig.mplstyle")
+colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
-const datafile = joinpath(data, "spectra_for_bin.jld2")
+const datafile = string(abspath(joinpath(data, "spectra_for_bin.jld2")))
 
-# read in the data
-d = load(datafile)
-wavs = d["wavs"]
-flux = d["flux"]
-templates = d["templates"]
-lines = d["lines"]
-depths = d["depths"]
-
-function make_ccf_plots(wavs, flux, lines, depths, title, filename)
+function make_ccf_plots(wavs, flux, lines, depths, title, filename; plot_correlation=true)
     # calculate a ccf for one line
     v_grid, ccf1 = calc_ccf(wavs, flux, lines, depths,
                             7e5, mask_type=EchelleCCFs.TopHatCCFMask,
@@ -55,29 +49,39 @@ function make_ccf_plots(wavs, flux, lines, depths, title, filename)
     mean_bis .-= mean(mean_bis)
 
     # make plotting objects
-    fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(9, 7))
+    fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(12.8, 4.8))
     fig.subplots_adjust(wspace=0.05)
-    # ax1.set_box_aspect(1)
-    # ax2.set_box_aspect(1)
+    # ax1.set_box_aspect(0.75)
+    # ax2.set_box_aspect(0.75)
 
     ax1.plot(mean_bis, mean_int, c="k", lw=3.0)
     ax2.scatter(xdata, ydata, c="k", s=1.5, alpha=0.9)
-    ax2.plot(xmodel, ymodel, c="k", ls="--", label=L"{\rm Slope } \approx\ " * fit_label, lw=2.5)
-    ax2.legend()
+    if plot_correlation
+        label = L"{\rm Slope } \approx\ " * fit_label
+        ax2.plot(xmodel, ymodel, c="k", ls="--", label=label, lw=2.5)
+        ax2.legend()
+    end
 
-    ax1.set_xlabel(L"\Delta\ v\ {\rm (m/s)}")
+    ax1.set_xlabel(L"\Delta v\ {\rm (m\ s}^{-1}{\rm )}")
     ax1.set_ylabel(L"{\rm Normalized\ CCF}")
-    ax2.set_xlabel(L"\Delta v\ {\rm (m s}^{-1}{\rm )}")
-    ax2.set_ylabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m s}^{-1}{\rm )}")
+    ax2.set_xlabel(L"{\rm RV\ - \overline{\rm RV}\ } {\rm (m\ s}^{-1}{\rm )}")
+    ax2.set_ylabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m\ s}^{-1}{\rm )}")
     ax2.yaxis.set_label_position("right")
     ax2.yaxis.tick_right()
     if !isempty(title)
         fig.suptitle("{\\rm " * replace(title, " "=> "\\ ") * "}", y=0.98)
     end
-    fig.tight_layout()
     fig.savefig(filename)
     plt.clf(); plt.close()
 end
+
+# read in the data
+d = load(datafile)
+wavs = d["wavs"]
+flux = d["flux"]
+templates = d["templates"]
+lines = d["lines"]
+depths = d["depths"]
 
 # collect lines
 lines = collect(lines)
@@ -87,12 +91,13 @@ lines = collect(lines)
 # plt.show()
 
 # do all lines
-outfile = joinpath(figures, "ccf_bin.pdf")
-make_ccf_plots(wavs, flux, lines, depths, "", outfile)
+outfile = string(abspath(joinpath(figures, "ccf_bin.pdf")))
+make_ccf_plots(wavs, flux, lines, depths, "", outfile, plot_correlation=false)
 
 # do a single line (a nice one)
-idx = findfirst(x -> occursin.("FeI_5576", x), templates)
-make_ccf_plots(wavs, flux, [lines[idx]], [depths[idx]], "Single Line")
+# outfile = string(abspath(joinpath(figures, "FeI_5576_ccf.pdf")))
+# idx = findfirst(x -> occursin.("FeI_5576", x), templates)
+# make_ccf_plots(wavs, flux, [lines[idx]], [depths[idx]], "Single Line", outfile)
 
 # now do all lines of a given template
 # lp = GRASS.LineProperties()

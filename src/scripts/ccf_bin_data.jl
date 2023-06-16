@@ -6,18 +6,13 @@ using GRASS
 using Printf
 using Revise
 using FileIO
-using Random
 using DataFrames
 using Statistics
 using EchelleCCFs
-using Polynomials
-using Distributions
-using BenchmarkTools
-using HypothesisTests
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
-datafile = joinpath(data, "spectra_for_bin.jld2")
+const datafile = string(abspath(joinpath(data, "spectra_for_bin.jld2")))
 
 # get input data properties
 lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])

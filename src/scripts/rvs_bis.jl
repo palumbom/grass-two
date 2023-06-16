@@ -214,7 +214,7 @@ for (idx, file) in enumerate(lp.file)
         ax.set_xticks([-1, -0.5, 0.0, 0.5, 1.0])
         ax.set_yticks([-1, -0.5, 0.0, 0.5, 1.0])
     end
-    fig2.supxlabel(L"\Delta v\ {\rm (m\ s}^{-1}{\rm )}", fontsize=title_font)#, x=0.55, y=0.05)
+    fig2.supxlabel(L"{\rm RV\ - \overline{\rm RV}\ } {\rm (m\ s}^{-1}{\rm )}", fontsize=title_font)#, x=0.55, y=0.05)
     fig2.supylabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m\ s}^{-1}{\rm )}", fontsize=title_font)#, x=0.03, y=0.52)
     fig2.suptitle(title, fontsize=title_font, x=0.5, y=0.925)
     fig2.subplots_adjust(hspace=0.025, wspace=0.025)
