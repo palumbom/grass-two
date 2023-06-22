@@ -135,10 +135,9 @@ function main()
 
     # wavelength of line to synthesize/compare to iag
     for (i, file) in enumerate(files)
-        # if !contains(file, "NaI_5896")
-        #     continue
+        # if !contains(file, "FeI_6170")
+            # continue
         # end
-        # i < 13 && continue
         println(">>> Running " * line_names[i] * "...")
 
         # get properties from line
@@ -151,13 +150,17 @@ function main()
         flux_iag0 ./= maximum(flux_iag0)
 
         # convolve IAG spectrum to LARS resolution
-        wavs_iag, flux_iag = GRASS.convolve_gauss(wavs_iag0, flux_iag0, new_res=7e5, oversampling=2.0)
+        wavs_iag, flux_iag = GRASS.convolve_gauss(wavs_iag0, flux_iag0, new_res=7e5, oversampling=4.0)
 
         # get depth from IAG spectrum
         idxl = findfirst(x -> x .>= airwav - 0.125, wavs_iag)
         idxr = findfirst(x -> x .>= airwav + 0.125, wavs_iag)
         iag_bot = minimum(view(flux_iag, idxl:idxr))
         iag_depth = 1.0 - iag_bot
+
+        # get wing indices
+        botind = argmin(view(flux_iag, idxl:idxr)) + idxl
+        idxl, idxr = GRASS.find_wing_index(0.9, flux_iag, min=botind)
 
         # set up for GRASS spectrum simulation
         function depth_diff(x)
@@ -227,19 +230,24 @@ function main()
         end
         rv_sim = mean(view(vel_sim, idx1:idx2))
 
-        # transform the bisectors
+        # transform to lab frame
         vel_iag .-= rv_iag
         vel_sim .-= rv_sim
         wavs_iag ./= calc_doppler_factor(rv_iag)
         wavs_sim ./= calc_doppler_factor(rv_sim)
 
         # interpolate IAG onto synthetic wavelength grid
-        flux_iag = GRASS.rebin_spectrum(wavs_iag, flux_iag, wavs_sim)
+        itp = GRASS.linear_interp(wavs_iag, flux_iag)
+        flux_iag = itp.(wavs_sim)
         wavs_iag = copy(wavs_sim)
 
         # re-compute line isolation indices because of interpolation
         idxl = findfirst(x -> x .>= airwav - 0.125, wavs_iag)
         idxr = findfirst(x -> x .>= airwav + 0.125, wavs_iag)
+
+        # get wing indices
+        botind = argmin(view(flux_iag, idxl:idxr)) + idxl
+        idxl, idxr = GRASS.find_wing_index(0.9, flux_iag, min=botind)
 
         # clean the IAG spectrum
         # flux_mod = model_iag_blends(wavs_sim, flux_sim, wavs_iag, flux_iag, plot=false)
@@ -258,23 +266,21 @@ function main()
         # vel_mod = GRASS.c_ms .* (bis_mod .- airwav) ./ (airwav)
 
         # find mean velocities in order to align bisectors
-        N = 0.05
-        M = 0.50
+        N = 0.10
+        M = 0.70
         idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim)
         idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim)
         if isnothing(idx2)
             idx2 = findfirst(x -> x .>= 0.9, int_sim)
         end
-        # rv_sim = mean(view(vel_sim, idx1:idx2))
-        rv_sim = mean(vel_sim[idx1:idx2])
+        rv_sim = mean(view(vel_sim, idx1:idx2))
 
         idx1 = findfirst(x -> x .>= N * iag_depth + iag_bot, int_iag)
         idx2 = findfirst(x -> x .>= M * iag_depth + iag_bot, int_iag)
         if isnothing(idx2)
             idx2 = findfirst(x -> x .>= 0.9, int_iag)
         end
-        # rv_iag = mean(view(vel_iag, idx1:idx2))
-        rv_iag = mean(vel_iag[idx1:idx2])
+        rv_iag = mean(view(vel_iag, idx1:idx2))
 
         # idx1 = findfirst(x -> x .>= N * mod_depth + minimum(flux_mod), int_mod)
         # idx2 = findfirst(x -> x .>= M * mod_depth + minimum(flux_mod), int_mod)
@@ -353,10 +359,11 @@ function main()
             ax1.set_ylim(minimum(flux_sim) - 0.05, 1.05)
             ax2.set_xlim(-35, 35)
             ax2.set_ylim(minimum(flux_sim) - 0.05, 1.05)
-            ax1.set_xlabel(L"{\rm Relative\ Velocity\ (ms^{-1})}", fontsize=12)
+            ax1.set_xlabel(L"{\rm Relative\ Velocity\ (m\ s^{-1})}", fontsize=13)
             ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
-            ax2.set_xlabel(L"{\rm IAG\ -\ GRASS\ (ms^{-1})}", fontsize=12)
-            ax1.legend(loc="upper right", prop=Dict("size"=>12), labelspacing=0.25)
+            ax2.set_xlabel(L"{\rm IAG\ -\ GRASS\ (m\ s^{-1})}", fontsize=13)
+            ax1.legend(labelspacing=0.25)
+            # ax2.legend(loc="upper right", prop=Dict("size"=>12.5), labelspacing=0.25)
 
             # set the title
             fig.suptitle(("\${\\rm " * title * "}\$"), y=0.95)
