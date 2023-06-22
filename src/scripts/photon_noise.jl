@@ -1,8 +1,4 @@
-# the package
-using Pkg; Pkg.activate(".")
 using BenchmarkTools
-using Debugger
-using Interpolations
 using Printf
 using Revise
 using GRASS
@@ -11,7 +7,7 @@ using GRASS
 using LaTeXStrings
 import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
 using PyCall; animation = pyimport("matplotlib.animation")
-mpl.style.use(GRASS.moddir * "figures1/fig.mplstyle")
+mpl.style.use(GRASS.moddir * "fig.mplstyle")
 
 # set Desktop directory
 run, plot = parse_args(ARGS)
@@ -19,7 +15,7 @@ grassdir, plotdir, datadir = check_plot_dirs()
 
 # set up stuff for lines
 N = 132
-Nt = 50
+Nt = 40
 lines = [5434.5]
 templates = ["FeI_5434"]
 depths = [0.8]
@@ -33,9 +29,9 @@ spec = SpecParams(lines=lines, depths=depths, variability=variability,
 lambdas1, outspec1 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true)
 
 # loop over SNRs
-nloop = 50
+nloop = 2
 A = 0.8
-snr = range(1000, 5000, step=25.0)
+snr = range(50, 5050, step=500.0)
 rms = zeros(length(snr))
 idealized = zeros(length(snr))
 for i in eachindex(snr)
@@ -73,8 +69,8 @@ ax.set_ylabel("RMS RV (m/s)")
 # ax.set_xscale("log", base=10)
 # ax.set_yscale("log", base=10)
 ax.legend()
-plt.show()
 fig.savefig(plotdir * "photon_noise.pdf")
+plt.show()
 plt.clf(); plt.close()
 
 # idx1 = findfirst(x -> x .< 0.5, rms)
