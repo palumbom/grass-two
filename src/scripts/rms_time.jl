@@ -22,8 +22,8 @@ lp = GRASS.LineProperties()
 
 # set up stuff for lines
 N = 132
-Nt = 50
-lines = lp.λrest
+Nt = 32000
+lines = collect(range(5400.0, 5500.0, length=length(lp.λrest)))
 templates = lp.file
 depths = lp.depth
 variability = trues(length(templates))
