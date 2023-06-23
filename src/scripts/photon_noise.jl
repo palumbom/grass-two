@@ -29,9 +29,9 @@ spec = SpecParams(lines=lines, depths=depths, variability=variability,
 lambdas1, outspec1 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true)
 
 # loop over SNRs
-nloop = 2
+nloop = 10
 A = 0.8
-snr = range(50, 5050, step=500.0)
+snr = range(500.0, 5000.0, step=50.0)
 rms = zeros(length(snr))
 idealized = zeros(length(snr))
 for i in eachindex(snr)

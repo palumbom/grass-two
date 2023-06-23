@@ -1,0 +1,23 @@
+#!/bin/bash
+#PBS -A dfc13_mri
+#PBS -l qos=mgc_open
+#PBS -l nodes=1:ppn=1:gpus=1
+#PBS -l feature=rhel7
+#PBS -l walltime=48:00:00
+#PBS -l pmem=32gb
+#PBS -w /storage/home/mlp95/work/grass-two/
+#PBS -j oe
+#PBS -o /storage/home/mlp95/work/logs/
+#PBS -e /storage/home/mlp95/work/logs/
+#PBS -N GRASS_rmstime
+
+echo "Starting job $PBS_JOBNAME"
+date
+echo "Job id: $PBS_JOBID"
+echo "About to change into $PBS_O_WORKDIR"
+cd $PBS_O_WORKDIR
+echo "About to start Julia"
+julia -e 'using Pkg; Pkg.activate("."); using CUDA; CUDA.set_runtime_version!("local")'
+julia src/scripts/rms_time.jl
+echo "Julia exited"
+date
