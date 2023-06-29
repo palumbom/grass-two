@@ -135,9 +135,9 @@ function main()
 
     # wavelength of line to synthesize/compare to iag
     for (i, file) in enumerate(files)
-        # if !contains(file, "FeI_6170")
-            # continue
-        # end
+        if !contains(file, "FeI_5382")
+            continue
+        end
         println(">>> Running " * line_names[i] * "...")
 
         # get properties from line
@@ -170,7 +170,7 @@ function main()
             templates = [file]
             resolution = 7e5
             disk = DiskParams(N=132, Nt=5)
-            spec = SpecParams(lines=lines, depths=depths, templates=templates, resolution=resolution)
+            spec = SpecParams(lines=lines, depths=depths, templates=templates, resolution=resolution, variability=[false])
 
             # simulate the spectrum
             wavs_sim, flux_sim = synthesize_spectra(spec, disk, use_gpu=use_gpu,
@@ -195,7 +195,7 @@ function main()
         templates = [file]
         resolution = 1e6
         spec = SpecParams(lines=lines, depths=depths, templates=templates,
-                          resolution=resolution, buffer=1.5)
+                          resolution=resolution, buffer=1.5, variability=[false])
         disk = DiskParams(N=132, Nt=50)
 
         # simulate the spectrum
@@ -209,9 +209,15 @@ function main()
                                                nflux=50, top=0.9)
         bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=50, top=0.9)
 
+        plt.plot(bis_sim, int_sim)
+        plt.show()
+
         # convert wavelengths to vel grids
         vel_iag = GRASS.c_ms .* (bis_iag .- airwav) ./ (airwav)
         vel_sim = GRASS.c_ms .* (bis_sim .- airwav) ./ (airwav)
+
+        plt.plot(vel_sim, int_sim)
+        plt.show()
 
         # compute velocity as mean bisector between N and M % depth
         N = 0.1
@@ -236,6 +242,9 @@ function main()
         wavs_iag ./= calc_doppler_factor(rv_iag)
         wavs_sim ./= calc_doppler_factor(rv_sim)
 
+        plt.plot(vel_sim, int_sim)
+        plt.show()
+
         # interpolate IAG onto synthetic wavelength grid
         itp = GRASS.linear_interp(wavs_iag, flux_iag)
         flux_iag = itp.(wavs_sim)
@@ -258,12 +267,22 @@ function main()
         bis_iag, int_iag = GRASS.calc_bisector(view(wavs_iag, idxl:idxr),
                                                view(flux_iag, idxl:idxr),
                                                nflux=50, top=0.9)
+
+        plt.plot(bis_sim, int_sim)
+        plt.show()
+
         # bis_mod, int_mod = GRASS.calc_bisector(wavs_iag, flux_mod, nflux=50, top=0.9)
+
+        bis_sim2, int_sim2 = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=60, top=0.99)
 
         # transform bisectors to velocities
         vel_sim = GRASS.c_ms .* (bis_sim .- airwav) ./ (airwav)
+        vel_sim2 = GRASS.c_ms .* (bis_sim2 .- airwav) ./ (airwav)
         vel_iag = GRASS.c_ms .* (bis_iag .- airwav) ./ (airwav)
         # vel_mod = GRASS.c_ms .* (bis_mod .- airwav) ./ (airwav)
+
+        plt.plot(vel_sim, int_sim)
+        plt.show()
 
         # find mean velocities in order to align bisectors
         N = 0.10
@@ -274,6 +293,13 @@ function main()
             idx2 = findfirst(x -> x .>= 0.9, int_sim)
         end
         rv_sim = mean(view(vel_sim, idx1:idx2))
+
+        idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim2)
+        idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim2)
+        if isnothing(idx2)
+            idx2 = findfirst(x -> x .>= 0.9, int_sim2)
+        end
+        rv_sim2 = mean(view(vel_sim2, idx1:idx2))
 
         idx1 = findfirst(x -> x .>= N * iag_depth + iag_bot, int_iag)
         idx2 = findfirst(x -> x .>= M * iag_depth + iag_bot, int_iag)
@@ -292,8 +318,13 @@ function main()
 
         # align the bisectors
         vel_sim .-= rv_sim
+        vel_sim2 .-= rv_sim2
         vel_iag .-= rv_iag
         # vel_mod .-= rv_mod
+
+        plt.plot(vel_sim, int_sim)
+        plt.show()
+
 
         # big function for plotting
         function comparison_plots()
@@ -347,6 +378,7 @@ function main()
             # plot bisectors
             ax1.plot(vel_sim[4:end], int_sim[4:end], marker="o", color="black", ms=3.0, lw=2.0, markevery=1, label=L"{\rm Synthetic}")
             ax1.plot(vel_iag[4:end], int_iag[4:end], marker="s", c=colors[1], ms=2.0, lw=1.0, markevery=1, label=L"{\rm IAG}")
+            # ax1.plot(vel_sim2, int_sim2, marker="o", color="black", ms=3.0, lw=2.0, markevery=1, label=L"{\rm Derp}")
             # ax1.plot(vel_mod[2:end], int_mod[2:end], marker="^", c=colors[2], ms=2.0, lw=1.0, markevery=1, label=L"{\rm Cleaned\ IAG}")
 
             # plot residuals

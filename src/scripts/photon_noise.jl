@@ -8,6 +8,7 @@ using LaTeXStrings
 import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
 using PyCall; animation = pyimport("matplotlib.animation")
 mpl.style.use(GRASS.moddir * "fig.mplstyle")
+colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 # set Desktop directory
 run, plot = parse_args(ARGS)
@@ -15,9 +16,9 @@ grassdir, plotdir, datadir = check_plot_dirs()
 
 # set up stuff for lines
 N = 132
-Nt = 40
-lines = [5434.5]
-templates = ["FeI_5434"]
+Nt = 240
+lines = [5576.1]
+templates = ["FeI_5576"]
 depths = [0.8]
 variability = [true]
 resolution = 700000.0
@@ -29,9 +30,10 @@ spec = SpecParams(lines=lines, depths=depths, variability=variability,
 lambdas1, outspec1 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true)
 
 # loop over SNRs
-nloop = 10
+println("\t>>> Looping...")
+nloop = 5
 A = 0.8
-snr = range(500.0, 5000.0, step=50.0)
+snr = range(500.0, 5000.0, step=200.0)
 rms = zeros(length(snr))
 idealized = zeros(length(snr))
 for i in eachindex(snr)
@@ -61,13 +63,14 @@ idealized ./= nloop
 
 # now plot the result
 fig, ax = plt.subplots()
-ax.plot(snr, rms, color="tab:blue", label="Granulation + Photon")
-ax.plot(snr, idealized, color="tab:orange", label="Photon noise only")#, A = " * string(A))
+ax.plot(snr, rms, color=colors[1], label=L"{\rm Granulation\ +\ Photon}")
+ax.plot(snr, idealized, color=colors[2], label=L"{\rm Photon\ Noise\ Only}")#, A = " * string(A))
 ax.axhline(0.3, linestyle="--", alpha=0.5, c="k")
-ax.set_xlabel("SNR per pixel")
-ax.set_ylabel("RMS RV (m/s)")
-# ax.set_xscale("log", base=10)
-# ax.set_yscale("log", base=10)
+ax.axhline(0.1, linestyle="--", alpha=0.5, c="k")
+ax.set_xlabel(L"{\rm SNR\ per\ pixel}")
+ax.set_ylabel(L"{\rm RMS\ RV\ [m\ s}^{-1}{\rm ]}")
+ax.set_xscale("log", base=10)
+ax.set_yscale("log", base=10)
 ax.legend()
 fig.savefig(plotdir * "photon_noise.pdf")
 plt.show()

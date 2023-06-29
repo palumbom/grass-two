@@ -12,20 +12,27 @@ using BenchmarkTools
 using HypothesisTests
 
 # plotting
-# using LaTeXStrings
-# import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
-# mpl.style.use(GRASS.moddir * "fig.mplstyle")
-# colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
+using LaTeXStrings
+import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
+mpl.style.use(GRASS.moddir * "fig.mplstyle")
+colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 # get lines to construct templates
 lp = GRASS.LineProperties()
 
 # set up stuff for lines
+# N = 132
+# Nt = 32000
+# lines = collect(range(5400.0, 5500.0, length=length(lp.λrest)))
+# templates = lp.file
+# depths = lp.depth
+
 N = 132
-Nt = 32000
-lines = collect(range(5400.0, 5500.0, length=length(lp.λrest)))
-templates = lp.file
-depths = lp.depth
+Nt = 36000
+lines = [5576.0881]
+templates = ["FeI_5576"]
+depths = 0.8
+
 variability = trues(length(templates))
 resolution = 7e5
 disk = DiskParams(N=N, Nt=Nt)
@@ -37,11 +44,14 @@ lambdas1, outspec1 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true,
 outspec2 = GRASS.add_noise(outspec1, 500.0)
 
 # compute velocities
-println("\t>>> Calculating RVs...")
+println("\t>>> Calculating CCFs...")
 v_grid, ccf = calc_ccf(lambdas1, outspec1, spec)
+println("\t>>> Calculating RVs...")
 rvs, sigs = calc_rvs_from_ccf(v_grid, ccf)
 
+println("\t>>> Calculating CCFs...again...")
 v_grid2, ccf2 = calc_ccf(lambdas1, outspec2, spec)
+println("\t>>> Calculating RVs...again...")
 rvs2, sigs2 = calc_rvs_from_ccf(v_grid2, ccf2)
 
 # save the spectra and rvs
@@ -49,7 +59,21 @@ datafile = "rms_time.jld2"
 jldsave(datafile, lambdas1=lambdas1, outspec1=outspec1, outspec2=outspec2,
         rvs=rvs, sigs=sigs, rvs2=rvs2, sigs2=sigs2)
 
-#=# get power spectrum of velocities
+# load the data file
+# datafile = "rms_time.jld2"
+# d = load(datafile)
+# lambdas1 = d["lambdas1"]
+# outspec1 = d["outspec1"]
+# outspec2 = d["outspec2"]
+# rvs = d["rvs"]
+# sigs = d["sigs"]
+# rvs2 = d["rvs2"]
+# sigs2 = d["sigs2"]
+
+# rvs = rvs[1:16000]
+# rvs2 = rvs2[1:16000]
+
+# get power spectrum of velocities
 sampling_rate = 1.0/15.0
 F = fftshift(fft(rvs))
 freqs = fftshift(fftfreq(length(rvs), sampling_rate))
@@ -67,21 +91,26 @@ freqs_binned = collect(10.0 .^ (range(minfreq, maxfreq, step=freqstep)))
 freqs_bincen = (freqs_binned[2:end] .+ freqs_binned[1:end-1])./2
 F_binned = zeros(length(freqs_binned)-1)
 for i in eachindex(F_binned)
-    idx = findall(x -> (x .>= freqs_binned[i]) .& (x .<= freqs_binned[i+1]), freqs)
-    F_binned[i] = mean(abs.(F[idx]))
+    j = findall(x -> (x .>= freqs_binned[i]) .& (x .<= freqs_binned[i+1]), freqs)
+    F_binned[i] = mean(abs.(F[j]))
 end
 
 # plot it
 fig, ax1 = plt.subplots()
 ax1.scatter(freqs, abs.(F), s=1, c="k")
 ax1.scatter(freqs_bincen, F_binned, marker="x", c="red")
+ax1.axvline(1.0 / (60.0 * 20.0), ls=":", c="k", alpha=0.75, label=L"{\rm 20\ min.}")
+ax1.axvline(1.0 / (15.0), ls="--", c="k", alpha=0.75, label=L"{\rm 15\ sec.}")
 ax1.set_xscale("log")
 ax1.set_yscale("log")
+ax1.legend()
 ax1.set_xlabel("Frequency [Hz]")
 ax1.set_ylabel(L"{\rm Power\ [(m\ s}^{-1}{\rm )}^2 {\rm \ Hz}^{-1}{\rm ]}")
 # ax1.set_xlim(1e-8, maximum(freqs))
 # ax1.set_ylim(1, 1e5)
-plt.show()
+fig.savefig("power_spec.pdf")
+# plt.show()
+plt.clf(); plt.close()
 
 
 # running mean on different timescales
@@ -110,17 +139,19 @@ scales_min = scales .* 15.0 ./ 60.0
 fig, ax1 = plt.subplots()
 ax1.axhline(0.1, ls="--", c="k", alpha=0.75)
 ax1.axvline(8.0 * 60.0, ls="--", c="k", alpha=0.75)
-ax1.plot(scales_min, rms_smooth, c="red")
+ax1.plot(scales_min, rms_smooth, c="red", label=L"{\rm SNR} = \infty")
 ax1.plot(scales_min, rms_resids, c="green")
-ax1.plot(scales_min, rms_smooth2, ls=":", c="red")
+ax1.plot(scales_min, rms_smooth2, ls=":", c="red", label=L"{\rm SNR} = 500")
 ax1.plot(scales_min, rms_resids2, ls=":", c="green")
 ax1.set_xscale("log")
-ax1.set_xlabel("Smoothing timescale (minutes)")
-ax1.set_ylabel("RMS RV (m/s)")
+ax1.set_xlabel(L"{\rm Smoothing\ timescale\ [min.]}")
+ax1.set_ylabel(L"{\rm RMS\ RV\ [m\ s}^{-1}{\rm ]}")
 ax1.set_xlim(1.0, 7e3)
 ax1.set_ylim(0.0, 1.0)
-plt.show()=#
-
+ax1.legend()
+fig.savefig("rms_smoothing.pdf")
+# plt.show()
+plt.clf(); plt.close()
 
 
 
