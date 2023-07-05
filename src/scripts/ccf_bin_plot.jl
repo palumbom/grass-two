@@ -75,6 +75,9 @@ function make_ccf_plots(wavs, flux, lines, depths, title, filename; plot_correla
     plt.clf(); plt.close()
 end
 
+# get line properties
+lp = GRASS.LineProperties()
+
 # read in the data
 d = load(datafile)
 wavs = d["wavs"]
@@ -95,48 +98,81 @@ outfile = string(abspath(joinpath(figures, "ccf_bin.pdf")))
 make_ccf_plots(wavs, flux, lines, depths, "", outfile, plot_correlation=false)
 
 # do a single line (a nice one)
-# outfile = string(abspath(joinpath(figures, "FeI_5576_ccf.pdf")))
-# idx = findfirst(x -> occursin.("FeI_5576", x), templates)
-# make_ccf_plots(wavs, flux, [lines[idx]], [depths[idx]], "Single Line", outfile)
+outfile = string(abspath(joinpath(figures, "FeI_5576_ccf.pdf")))
+idx = findfirst(x -> occursin.("FeI_5576", x), templates)
+make_ccf_plots(wavs, flux, [lines[idx]], [depths[idx]], "Single Line", outfile)
 
 # now do all lines of a given template
-# lp = GRASS.LineProperties()
-# line_names = GRASS.get_name(lp)
-# for i in line_names
-#     idx = findall(x -> occursin.(i, x), templates)
-#     make_ccf_plots(wavs, flux, lines[idx], depths[idx], i)
-# end
+line_names = GRASS.get_name(lp)
+for i in line_names
+    outfile = string(abspath(joinpath(figures, i * "_rv_vs_bis.pdf")))
+    idx = findall(x -> occursin.(i, x), templates)
+    make_ccf_plots(wavs, flux, lines[idx], depths[idx], i, outfile)
+end
 
-# # get list of line idxs in each depth bin
-# depth_bins = range(0.0, 1.0, step=0.1)
-# idxs = []
-# for i in eachindex(depth_bins)
-#     # get indices
-#     i == 1 && continue
-#     idx = map(x -> (x .<= depth_bins[i]) & (x .> depth_bins[i - 1]), depths)
-#     push!(idxs, idx)
-# end
+# get list of line idxs in each depth bin
+depth_bins = range(0.0, 1.0, step=0.1)
+idxs = []
+for i in eachindex(depth_bins)
+    # get indices
+    i == 1 && continue
+    idx = map(x -> (x .<= depth_bins[i]) & (x .> depth_bins[i - 1]), depths)
+    push!(idxs, idx)
+end
 
-# #
-# for i in eachindex(idxs)
-#     # get line title
-#     title = "Depths gt " * string(depth_bins[i]) * " and lt " * string(depth_bins[i+1])
-#     println(title)
+for i in eachindex(idxs)
+    # get line title
+    title = "Depths gt " * string(depth_bins[i]) * " and lt " * string(depth_bins[i+1])
+    println(title)
 
-#     # get the lines and make plots
-#     lines_i = view(lines, idxs[i])
-#     depths_i = view(depths, idxs[i])
-#     if isempty(lines_i)
-#         continue
-#     end
-#     make_ccf_plots(wavs, flux, lines_i, depths_i, title)
-# end
+    # outfile
+    outfile = string(abspath(joinpath(figures, string(depth_bins[i]) * "_rv_vs_bis.pdf")))
 
-# # read in formation temps
-# # TODO measure temperature weighted by information content (slope)
-# line_info = CSV.read(GRASS.datdir * "line_info.csv", DataFrame)
+    # get the lines and make plots
+    lines_i = view(lines, idxs[i])
+    depths_i = view(depths, idxs[i])
+    if isempty(lines_i)
+        continue
+    end
+    make_ccf_plots(wavs, flux, lines_i, depths_i, title, outfile)
+end
+
+# get formation temperatues
+line_info = CSV.read(GRASS.datdir * "line_info.csv", DataFrame)
+avg_temp_80 = line_info.avg_temp_80
+avg_temp_50 = line_info.avg_temp_50
+
+# read in formation temps
+# TODO measure temperature weighted by information content (slope)
 # plt.scatter(line_info.air_wavelength, line_info.avg_temp_50, c="tab:blue")
 # plt.scatter(line_info.air_wavelength, line_info.avg_temp_80, c="k")
 # plt.xlabel("Wavelength")
 # plt.ylabel("Avg. Line Formation Temperature")
 # plt.show()
+
+# get indices for bins
+temp_bins = range(4000.0, 5000.0, step=125.0)
+idxs = []
+for i in eachindex(depth_bins)
+    # get indices
+    i == 1 && continue
+    idx = map(x -> (x .<= temp_bins[i]) & (x .> temp_bins[i - 1]), avg_temp_50)
+    push!(idxs, idx)
+end
+
+for i in eachindex(idxs)
+    # get line title
+    title = "Temp gt " * string(temp_bins[i]) * " and lt " * string(temp_bins[i+1])
+    println(title)
+
+    # outfile
+    outfile = string(abspath(joinpath(figures, string(temp_bins[i]) * "_rv_vs_bis.pdf")))
+
+    # get the lines and make plots
+    lines_i = view(lines, idxs[i])
+    depths_i = view(depths, idxs[i])
+    if isempty(lines_i)
+        continue
+    end
+    make_ccf_plots(wavs, flux, lines_i, depths_i, title, outfile)
+end
