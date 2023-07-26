@@ -16,6 +16,19 @@ import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
 mpl.style.use(GRASS.moddir * "fig.mplstyle")
 colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
+function format_sci_not(number::Float64)
+    formatted_number = @sprintf("%.2e", number)
+    idx = findfirst('e', formatted_number)
+    mantissa = formatted_number[1:idx-1]
+    exponent = formatted_number[idx+1:end]
+    if exponent[2] == '0'
+        exponent = exponent[1] * exponent[3:end]
+    end
+    exponent = "10^{" * exponent * "}"
+    latex_string = "\\(" * mantissa * :"\\times" * exponent * "\\)"
+    return latex_string
+end
+
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
 const datafile = string(abspath(joinpath(data, "gpu_accuracy.jld2")))
@@ -41,8 +54,10 @@ ax1.plot(wavs_cpu64, flux_cpu64, ls="-", c="k", ms=ms, lw=3.0, label=L"{\rm CPU\
 ax1.scatter(wavs_gpu64, flux_gpu64, marker="s", alpha=0.75, c=colors[1], s=3.0, label=L"{\rm GPU\ (Float64)}", zorder=1)
 # ax1.plot(wavs_gpu32, flux_gpu_mean32, ls=":", c=colors[2], ms=ms, label=L"{\rm GPU\ (Float32)}")
 ax1.scatter(wavs_gpu32, flux_gpu32, marker="^", alpha=0.75, c=colors[2], s=3.0, label=L"{\rm GPU\ (Float32)}", zorder=2)
-ax2.scatter(wavs_cpu64, resids64, s=5, marker="s", c=colors[1], alpha=0.9)
-ax3.scatter(wavs_cpu64, resids32, s=5, marker="^", c=colors[2], alpha=0.9)
+ax2.scatter(wavs_cpu64, resids64, s=5, marker="s", c=colors[1], alpha=0.9,
+            label=L"{\rm Max\ residual\ } \sim\ " * format_sci_not(maximum(abs.(resids64))))
+ax3.scatter(wavs_cpu64, resids32, s=5, marker="^", c=colors[2], alpha=0.9,
+            label=L"{\rm Max\ residual\ } \sim\ " * format_sci_not(maximum(abs.(resids32))))
 
 # inset axis for marginal distribution of residuals
 ax2_histy = ax2.inset_axes([1.0015, 0, 0.075, 1], sharey=ax2)
@@ -85,6 +100,16 @@ legend = ax1.legend(loc="lower left", mode="expand", ncol=3, fontsize=12.5,
                     bbox_to_anchor=(0, 1.02, 1, 0.2), handletextpad=0.33)
 for legend_handle in legend.legendHandles
     legend_handle._sizes = [20.0]
+end
+
+legend = ax2.legend(loc="upper left", handletextpad=-1.75)
+for item in legend.legendHandles
+    item.set_visible(false)
+end
+
+legend = ax3.legend(loc="upper left", handletextpad=-1.75)
+for item in legend.legendHandles
+    item.set_visible(false)
 end
 
 

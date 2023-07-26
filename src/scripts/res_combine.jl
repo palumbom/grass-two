@@ -89,90 +89,46 @@ depths = d["depths"]
 # collect lines
 lines = collect(lines)
 
-# plot the spectrum
-# plt.plot(wavs, flux[:,1])
-# plt.show()
-
-# do all lines
-outfile = string(abspath(joinpath(figures, "all_lines_rv_vs_bis.pdf")))
-make_ccf_plots(wavs, flux, lines, depths, "", outfile, plot_correlation=false)
-
-# do a single line (a nice one)
-outfile = string(abspath(joinpath(figures, "single_line_rv_vs_bis.pdf")))
-idx1 = findfirst(x -> occursin.("FeI_5576", x), templates)
-make_ccf_plots(wavs, flux, [lines[idx1]], [depths[idx1]], "Single Line", outfile)
-
-# now do all lines of a given template
+# get lines
 line_names = GRASS.get_name(lp)
-for i in line_names
-    outfile = string(abspath(joinpath(figures, i * "_rv_vs_bis.pdf")))
-    idx = findall(x -> occursin.(i, x), templates)
-    make_ccf_plots(wavs, flux, lines[idx], depths[idx], i, outfile)
-end
+idx = findall(x -> occursin.("FeI_6302", x), templates)
 
-# get list of line idxs in each depth bin
-depth_bins = range(0.0, 1.0, step=0.1)
-idxs = []
-for i in eachindex(depth_bins)
-    # get indices
-    i == 1 && continue
-    idx = map(x -> (x .<= depth_bins[i]) & (x .> depth_bins[i - 1]), depths)
-    push!(idxs, idx)
-end
+# make resolution grid
+resolutions = reverse([0.98e5, 1.2e5, 1.37e5, 2.7e5, 7e5])
+oversampling = 4.0
 
-for i in eachindex(idxs)
-    # get line title
-    title = "Depths gt " * string(depth_bins[i]) * " and lt " * string(depth_bins[i+1])
-    println(title)
+for i in eachindex(resolutions)
+    res = resolutions[i]
 
-    # outfile
-    outfile = string(abspath(joinpath(figures, string(depth_bins[i]) * "_rv_vs_bis.pdf")))
+    if res != 7e5
+        # do an initial conv to get output size
+        wavs_to_deg = view(wavs, :, 1)
+        flux_to_deg = view(flux, :, 1)
 
-    # get the lines and make plots
-    lines_i = view(lines, idxs[i])
-    depths_i = view(depths, idxs[i])
-    if isempty(lines_i)
-        continue
+        wavs_degd, flux_degd = GRASS.convolve_gauss(wavs_to_deg, flux_to_deg, new_res=res,
+                                                    oversampling=oversampling)
+
+        # allocate memory
+        wavs_out = zeros(size(wavs_degd, 1), size(flux, 2))
+        flux_out = zeros(size(wavs_degd, 1), size(flux, 2))
+
+        # loop over epochs and convolve
+        for j in 1:size(flux,2)
+            flux_to_deg = view(flux, :, j)
+            wavs_degd, flux_degd = GRASS.convolve_gauss(wavs_to_deg, flux_to_deg, new_res=res,
+                                                        oversampling=oversampling)
+
+            # copy to array
+            wavs_out[:, j] .= wavs_degd
+            flux_out[:, j] .= flux_degd
+        end
+        wavs_out = wavs_out[:,1]
+    else
+        wavs_out = copy(wavs)
+        flux_out = copy(flux)
     end
-    make_ccf_plots(wavs, flux, lines_i, depths_i, title, outfile)
-end
 
-# get formation temperatues
-line_info = CSV.read(GRASS.datdir * "line_info.csv", DataFrame)
-avg_temp_80 = line_info.avg_temp_80
-avg_temp_50 = line_info.avg_temp_50
-
-# read in formation temps
-# TODO measure temperature weighted by information content (slope)
-# plt.scatter(line_info.air_wavelength, line_info.avg_temp_50, c="tab:blue")
-# plt.scatter(line_info.air_wavelength, line_info.avg_temp_80, c="k")
-# plt.xlabel("Wavelength")
-# plt.ylabel("Avg. Line Formation Temperature")
-# plt.show()
-
-# get indices for bins
-temp_bins = range(4000.0, 5000.0, step=125.0)
-idxs = []
-for i in eachindex(depth_bins)
-    # get indices
-    i == 1 && continue
-    idx = map(x -> (x .<= temp_bins[i]) & (x .> temp_bins[i - 1]), avg_temp_50)
-    push!(idxs, idx)
-end
-
-for i in eachindex(idxs)
-    # get line title
-    title = "Temp gt " * string(temp_bins[i]) * " and lt " * string(temp_bins[i+1])
-    println(title)
-
-    # outfile
-    outfile = string(abspath(joinpath(figures, string(temp_bins[i]) * "_rv_vs_bis.pdf")))
-
-    # get the lines and make plots
-    lines_i = view(lines, idxs[i])
-    depths_i = view(depths, idxs[i])
-    if isempty(lines_i)
-        continue
-    end
-    make_ccf_plots(wavs, flux, lines_i, depths_i, title, outfile)
+    # make plots
+    outfile = string(abspath(joinpath(figures, string(res) * "_rv_vs_bis.pdf")))
+    make_ccf_plots(wavs_out, flux_out, lines[idx], depths[idx], string(res), outfile)
 end

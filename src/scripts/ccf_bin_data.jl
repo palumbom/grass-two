@@ -6,9 +6,11 @@ using GRASS
 using Printf
 using Revise
 using FileIO
+using Random
 using DataFrames
 using Statistics
 using EchelleCCFs
+using Distributions
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
