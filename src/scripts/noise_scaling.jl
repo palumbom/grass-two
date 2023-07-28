@@ -8,6 +8,7 @@ using Profile
 using Statistics
 using EchelleCCFs
 using BenchmarkTools
+using Polynomials
 
 # plotting
 using LaTeXStrings
@@ -34,7 +35,7 @@ depths = d["depths"]
 lines = collect(lines)
 
 # isolate a chunk of spectrum around a good line
-idx = findall(x -> occursin.("FeI_5250.6", x), templates)
+idx = findall(x -> occursin.("FeI_5576", x), templates)
 line_centers = sort!(lines[idx])
 line_center = line_centers[5]
 
@@ -71,26 +72,86 @@ plt.plot(SNRs, rv_std)
 plt.show()
 =#
 
-# get SNR ~ 500 spectrum
-wavs_500 = copy(wavs)
-flux_500 = copy(flux)
-GRASS.add_noise!(flux_500, 500.0)
+function std_vs_number_of_lines(snr::T) where T<:Float64
+    # get spectrum at specified snr
+    wavs_snr = copy(wavs)
+    flux_snr = copy(flux)
+    GRASS.add_noise!(flux_snr, snr)
 
-rvs_std = zeros(length(idx))
+    rvs_std = zeros(length(idx))
 
-# include more and more lines in ccf
-for i in 1:length(idx)
-    @show i
-    # get lines to include in ccf
-    ls = lines[idx[1:i]]
-    ds = depths[idx[1:i]]
+    # include more and more lines in ccf
+    for i in 1:length(idx)
+        @show i
+        # get lines to include in ccf
+        ls = lines[idx[1:i]]
+        ds = depths[idx[1:i]]
 
-    # calculate ccf
-    v_grid, ccf1 = calc_ccf(wavs_500, flux_500, ls, ds, 7e5)
-    rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1)
-    rvs_std[i] = std(rvs1)
+        # calculate ccf
+        v_grid, ccf1 = calc_ccf(wavs_snr, flux_snr, ls, ds, 7e5)
+        rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1)
+        rvs_std[i] = std(rvs1)
+
+        # get ccf bisector
+        bis, int = GRASS.calc_bisector(v_grid, ccf1, nflux=50, top=0.99)
+        bis_inv_slope = GRASS.calc_bisector_inverse_slope(bis, int)
+
+        # scatter plot with correlations
+        xdata = rvs1 .- mean(rvs1)
+        ydata = bis_inv_slope .- mean(bis_inv_slope)
+
+        pfit = Polynomials.fit(xdata, ydata, 1)
+        xmodel = range(minimum(xdata), maximum(xdata), length=5)
+        ymodel = pfit.(xmodel)
+
+        slope = round(coeffs(pfit)[2], digits=3)
+        fit_label = "\$ " .* string(slope) .* "\$"
+
+        # plot
+        fig2, ax2 = plt.subplots()
+        ax2.scatter(xdata, ydata, c="k", s=2)
+        ax2.plot(xmodel, ymodel, ls="--", c="k", label=L"{\rm Slope } \approx\ " * fit_label, lw=2.5)
+
+        ax2.set_xlabel(L"{\rm RV\ - \overline{\rm RV}\ } {\rm (m\ s}^{-1}{\rm )}")
+        ax2.set_ylabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m\ s}^{-1}{\rm )}")
+        ax2.set_title("SNR = " * string(Int(snr)) * ", Nlines = " * string(i))
+        ax2.legend()
+        ofile = string(joinpath(figures, "rv_vs_bis_snr_" * string(Int(snr)) * "_lines_" * string(i) * ".pdf"))
+        fig2.savefig(ofile)
+        plt.clf()
+    end
+    return rvs_std
 end
 
-plt.plot(1:length(idx), rvs_std)
-plt.savefig("derp.pdf")
-plt.close()
+# snrs to loop over
+snrs_for_lines = range(100.0, 1000.0, step=100.0)
+
+# set up colors
+pcolors = plt.cm.rainbow(range(0, 1, length=length(idx)))
+
+rvs_std_out = zeros(length(idx), length(snrs_for_lines))
+
+
+for i in eachindex(snrs_for_lines)
+    # get the stuff
+    derp  = std_vs_number_of_lines(snrs_for_lines[i])
+
+    rvs_std_out[:, i] = derp
+
+end
+
+# set up plots
+fig1, ax1 = plt.subplots()
+
+# plot snr vs number of lines
+for i in eachindex(snrs_for_lines)
+    ax1.plot(1:length(idx), rvs_std_out[:,i], label="SNR = " * string(snrs_for_lines[i]), c=pcolors[i,:])
+end
+
+ax1.set_xlabel("Number of lines")
+ax1.set_ylabel("RV RMS (m/s)")
+ax1.set_xscale("log", base=2)
+ax1.set_yscale("log", base=2)
+ax1.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+fig1.savefig(string(joinpath(figures, "std_vs_number_of_lines_same.pdf")))
+plt.clf(); plt.close("all")
