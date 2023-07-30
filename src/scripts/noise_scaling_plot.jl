@@ -19,7 +19,7 @@ colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
 const datafile = string(abspath(joinpath(data, "picket_fence.jld2")))
-plotsubdir = joinpath(figures, "snr_plots")
+plotsubdir = string(joinpath(figures, "snr_plots"))
 if !isdir(plotsubdir)
     mkdir(plotsubdir)
 end
@@ -124,14 +124,14 @@ snrs_for_lines = range(100.0, 1000.0, step=100.0)
 pcolors = plt.cm.rainbow(range(0, 1, length=length(lines)))
 rvs_std_out = zeros(length(lines), length(snrs_for_lines))
 
-# write the data
-jldsave(joinpath(data, "rvs_std_out.jld2"), snrs_for_lines=snrs_for_lines, rvs_std_out=rvs_std_out)
-
 for i in eachindex(snrs_for_lines)
     # get the stuff
     out = std_vs_number_of_lines(snrs_for_lines[i])
     rvs_std_out[:, i] = out
 end
+
+# write the data
+jldsave(string(joinpath(data, "rvs_std_out.jld2")), snrs_for_lines=snrs_for_lines, rvs_std_out=rvs_std_out)
 
 # set up plots
 fig1, ax1 = plt.subplots()

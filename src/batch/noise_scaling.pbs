@@ -18,7 +18,7 @@ echo "About to change into $PBS_O_WORKDIR"
 cd $PBS_O_WORKDIR
 echo "About to start Julia"
 julia -e 'using Pkg; Pkg.activate("."); using CUDA; CUDA.set_runtime_version!("local")'
-julia src/scripts/noise_scaling_data.jl
-# julia src/scripts/noise_scaling.jl
+# julia src/scripts/noise_scaling_data.jl
+julia src/scripts/noise_scaling_plot.jl
 echo "Julia exited"
 date
