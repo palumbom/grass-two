@@ -35,7 +35,7 @@ depths = d["depths"]
 lines = collect(lines)
 
 # isolate a chunk of spectrum around a good line
-idx = findall(x -> occursin.("CaI_6169.0", x), templates)
+idx = findall(x -> occursin.("FeI_5576", x), templates)
 sort_idx = sortperm(lines[idx])
 line_centers = lines[idx][sort_idx]
 the_depths = depths[idx][sort_idx]
@@ -67,7 +67,7 @@ mean_bis = mean(bis, dims=2)
 mean_int = mean(int, dims=2)
 
 # get the redshifted bisectors
-blu_idx = rvs1 .< -0.5
+blu_idx = rvs1 .< 0.5
 red_idx = rvs1 .> 0.5
 
 # get means for red and blue

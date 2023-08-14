@@ -42,7 +42,7 @@ for i in eachindex(lp.λrest)
     depths = [lp.depth[i]]
     variability = trues(length(templates))
     resolution = 7e5
-    disk = DiskParams(N=N, Nt=Nt)
+    disk = DiskParams(Nt=Nt)
     spec = SpecParams(lines=lines, depths=depths, variability=variability,
                       templates=templates, resolution=resolution)
 

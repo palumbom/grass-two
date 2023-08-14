@@ -46,13 +46,16 @@ end
 function get_one_line(wavs, flux, line_number)
     idx1 = findfirst(x -> x .>= lines[line_number] - 0.5 * line_sep, wavs)
     idx2 = findfirst(x -> x .>= lines[line_number] + 0.5 * line_sep, wavs)
-    return view(wavs, idx1:idx2), view(flux, idx1:idx2, :)
+    return view(wavs, idx1:idx2), view(flux, idx1:idx2, 1)
 end
 
 # TODO do they not match or is this numerical noise????
-#=for i in 1:10
+for i in 1:10
     # get just line
     wavs_temp, flux_temp = get_one_line(wavs, flux, i)
+
+    # calculate the depth
+    println(maximum(flux_temp[:,1]) .- minimum(flux_temp[:,1]))
 
     # get bisector
     bis, int = GRASS.calc_bisector(wavs_temp, flux_temp, nflux=50)
@@ -61,14 +64,19 @@ end
 
     plt.plot(vel, int)
 end
-plt.show()=#
+plt.show()
 
+
+#=nlines_to_do = 100
 function std_vs_number_of_lines(snr::T) where T<:Float64
+    #
+
+
     # allocate memory
-    rvs_std = zeros(length(lines))
+    rvs_std = zeros(nlines_to_do)
 
     # include more and more lines in ccf
-    for i in 1:length(lines)
+    for i in 1:nlines_to_do
         # get lines to include in ccf
         ls = lines[1:i]
         ds = depths[1:i]
@@ -121,8 +129,8 @@ end
 snrs_for_lines = range(100.0, 1000.0, step=100.0)
 
 # set up colors
-pcolors = plt.cm.rainbow(range(0, 1, length=length(lines)))
-rvs_std_out = zeros(length(lines), length(snrs_for_lines))
+pcolors = plt.cm.rainbow(range(0, 1, length=snrs_for_lines))
+rvs_std_out = zeros(nlines_to_do, length(snrs_for_lines))
 
 for i in eachindex(snrs_for_lines)
     # get the stuff
@@ -138,7 +146,7 @@ fig1, ax1 = plt.subplots()
 
 # plot snr vs number of lines
 for i in eachindex(snrs_for_lines)
-    ax1.plot(1:length(lines), rvs_std_out[:,i], label="SNR = " * string(snrs_for_lines[i]), c=pcolors[i,:])
+    ax1.plot(1:nlines_to_do, rvs_std_out[:,i], label="SNR = " * string(snrs_for_lines[i]), c=pcolors[i,:])
 end
 
 ax1.set_xlabel("Number of lines")
@@ -149,7 +157,7 @@ ax1.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 fig1.savefig(string(joinpath(figures, "std_vs_number_of_lines_same.pdf")))
 plt.clf(); plt.close("all")
 
-
+=#
 
 
 

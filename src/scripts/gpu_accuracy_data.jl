@@ -18,26 +18,29 @@ const datafile = string(abspath(joinpath(data, "gpu_accuracy.jld2")))
 lines = [5500.0, 5500.85, 5501.4, 5502.20, 5502.5, 5503.05]
 depths = [0.75, 0.4, 0.65, 0.55, 0.25, 0.7]
 templates = ["FeI_5434", "FeI_5576", "FeI_6173", "FeI_5432", "FeI_5576", "FeI_5250.6"]
+blueshifts = zeros(length(lines))
 resolution = 7e5
 buffer = 0.6
 
 # create composite types
-disk = DiskParams(N=132, Nt=5)
+disk = DiskParams(Nt=1)
 spec = SpecParams(lines=lines, depths=depths, templates=templates,
-                  resolution=resolution, buffer=buffer)
+                  blueshifts=blueshifts, resolution=resolution, buffer=buffer)
 
 # get the spectra
-println(">>> Doing CPU synthesis...")
+println(">>> Performing CPU synthesis...")
 wavs_cpu64, flux_cpu64 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=false)
-println(">>> Doing GPU synthesis (double precision)...")
+
+println(">>> Performing GPU synthesis (double precision)...")
 wavs_gpu64, flux_gpu64 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true)
-println(">>> Doing GPU synthesis (single precision)...")
+
+println(">>> Performing GPU synthesis (single precision)...")
 wavs_gpu32, flux_gpu32 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true, precision=Float32)
 
 # slice output
-flux_cpu64 = flux_cpu64[:,1]
-flux_gpu64 = flux_gpu64[:,1]
-flux_gpu32 = flux_gpu32[:,1]
+flux_cpu64 = dropdims(mean(flux_cpu64, dims=2), dims=2)
+flux_gpu64 = dropdims(mean(flux_gpu64, dims=2), dims=2)
+flux_gpu32 = dropdims(mean(flux_gpu32, dims=2), dims=2)
 
 # get flux residuals
 resids64 = flux_cpu64 .- flux_gpu64

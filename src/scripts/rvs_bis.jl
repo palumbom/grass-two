@@ -77,7 +77,7 @@ for (idx, file) in enumerate(lp.file)
 
     depths_plot[idx] = line_depths[idx]
 
-    disk = DiskParams(N=N, Nt=Nt)
+    disk = DiskParams(Nt=Nt)
     spec1 = SpecParams(lines=lines, depths=depths, variability=variability,
                        geffs=geffs, templates=templates, resolution=resolution)
     lambdas1, outspec1 = synthesize_spectra(spec1, disk, seed_rng=true,

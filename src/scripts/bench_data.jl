@@ -13,12 +13,13 @@ include(joinpath(abspath(@__DIR__), "paths.jl"))
 const datafile = string(abspath(joinpath(data, "benchmark.jld2")))
 
 function benchmark_cpu(spec::SpecParams, disk::DiskParams)
-    lambdas1, outspec1 = synthesize_spectra(spec, disk, verbose=false, seed_rng=true)
+    lambdas1, outspec1 = synthesize_spectra(spec, disk, verbose=false, seed_rng=false)
     return nothing
 end
 
 function benchmark_gpu(spec::SpecParams, disk::DiskParams, precision::DataType)
-    lambdas1, outspec1 = synthesize_spectra(spec, disk, verbose=false, seed_rng=true, use_gpu=true, precision=precision)
+    lambdas1, outspec1 = synthesize_spectra(spec, disk, verbose=false, seed_rng=false,
+                                            use_gpu=true, precision=precision)
     return nothing
 end
 
@@ -38,7 +39,7 @@ function bmark_everything(b_cpu, b_gpu, b_gpu32, lines, depths; max_cpu=8)
 
         # create spec, disk instances
         spec = SpecParams(lines=lines_i, depths=depths_i, templates=templates_i, resolution=resolution_i)
-        disk = DiskParams(N=132, Nt=50)
+        disk = DiskParams(Nt=50)
 
         # CPU bench loop
         if i <= max_cpu

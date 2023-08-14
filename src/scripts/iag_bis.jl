@@ -169,7 +169,7 @@ function main()
             depths = x
             templates = [file]
             resolution = 7e5
-            disk = DiskParams(N=132, Nt=5)
+            disk = DiskParams(Nt=5)
             spec = SpecParams(lines=lines, depths=depths, templates=templates, resolution=resolution, variability=[false])
 
             # simulate the spectrum
@@ -196,7 +196,7 @@ function main()
         resolution = 1e6
         spec = SpecParams(lines=lines, depths=depths, templates=templates,
                           resolution=resolution, buffer=1.5, variability=[false])
-        disk = DiskParams(N=132, Nt=50)
+        disk = DiskParams(Nt=50)
 
         # simulate the spectrum
         wavs_sim, flux_sim = synthesize_spectra(spec, disk, use_gpu=use_gpu,

@@ -46,14 +46,13 @@ depths = depths[idx]
 templates = templates[idx]
 
 # synthesize a spectrum
-N = 132
 Nt = 1000
 variability = trues(length(lines))
 resolution = 7e5
 seed_rng = true
 
 # do a quick synthesis for precompilation purposes
-disk0 = DiskParams(N=N, Nt=10)
+disk0 = DiskParams(Nt=10)
 spec0 = SpecParams(lines=lines[1:2], depths=depths[1:2],
                    variability=variability[1:2], templates=templates[1:2],
                    resolution=resolution)
@@ -61,7 +60,7 @@ wavs0, flux0 = synthesize_spectra(spec0, disk0, seed_rng=true, verbose=true, use
 
 
 # now do the actual synthesis
-disk = DiskParams(N=N, Nt=Nt)
+disk = DiskParams(Nt=Nt)
 spec1 = SpecParams(lines=lines, depths=depths, variability=variability, templates=templates, resolution=resolution)
 wavs, flux = synthesize_spectra(spec1, disk, seed_rng=true, verbose=true, use_gpu=true)
 
