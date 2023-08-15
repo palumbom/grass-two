@@ -1,15 +1,14 @@
 #!/bin/bash
-#PBS -A dfc13_mri
-#PBS -l qos=mgc_open
-#PBS -l nodes=1:ppn=1:gpus=1
-#PBS -l feature=rhel7
-#PBS -l walltime=48:00:00
-#PBS -l pmem=32gb
-#PBS -w /storage/home/mlp95/work/grass-two/
-#PBS -j oe
-#PBS -o /storage/home/mlp95/work/logs/
-#PBS -e /storage/home/mlp95/work/logs/
-#PBS -N GRASS_rmstime
+#SBATCH -A dfc13_mri
+#SBATCH -p mgc-mri
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --gpus-per-task=1
+#SBATCH --mem-per-cpu=16GB
+#SBATCH --time=48:00:00
+#SBATCH --job-name=GRASS_rms_time
+#SBATCH --chdir=/storage/home/mlp95/work/grass-two
+#SBATCH --output=/storage/home/mlp95/work/logs/rms_time.%j.out
 
 echo "Starting job $PBS_JOBNAME"
 date
