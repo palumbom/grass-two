@@ -10,9 +10,12 @@ using EchelleCCFs
 using BenchmarkTools
 using Polynomials
 
+using AbstractGPs, TemporalGPs, KernelFunctions
+using RvSpectML
+
 # plotting
 using LaTeXStrings
-import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
+import PyPlot; plt = PyPlot; mpl = plt.matplotlib; #plt.ioff()
 mpl.style.use(GRASS.moddir * "fig.mplstyle")
 colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
@@ -43,46 +46,51 @@ function get_lines(wavs, flux, last_line_number)
     return view(wavs, 1:idx), view(flux, 1:idx, :)
 end
 
-function get_one_line(wavs, flux, line_number)
+function get_one_line(wavs, flux, line_number; t=1)
     idx1 = findfirst(x -> x .>= lines[line_number] - 0.5 * line_sep, wavs)
     idx2 = findfirst(x -> x .>= lines[line_number] + 0.5 * line_sep, wavs)
-    return view(wavs, idx1:idx2), view(flux, idx1:idx2, 1)
+    return view(wavs, idx1:idx2), view(flux, idx1:idx2, t)
 end
 
-# TODO do they not match or is this numerical noise????
-for i in 1:10
-    # get just line
-    wavs_temp, flux_temp = get_one_line(wavs, flux, i)
+# # TODO do they not match or is this numerical noise????
+# for i in 1:10
+#     # get just one line
+#     if i == 2
+#         wavs_temp, flux_temp = get_one_line(wavs, flux, i, t=8)
+#     else
+#         wavs_temp, flux_temp = get_one_line(wavs, flux, i, t=1)
+#     end
 
-    # calculate the depth
-    println(maximum(flux_temp[:,1]) .- minimum(flux_temp[:,1]))
+#     # ccf
+#     ls = [lines[i]]
+#     ds = [maximum(flux_temp[:,1]) .- minimum(flux_temp[:,1])]
+#     v_grid, ccf1 = calc_ccf(wavs_temp, flux_temp, ls, ds, 7e5, Δv_step=10.0)
 
-    # get bisector
-    bis, int = GRASS.calc_bisector(wavs_temp, flux_temp, nflux=50)
+#     # get bisector
+#     vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.95)
 
-    vel = GRASS.c_ms * (bis .- lines[i]) ./ (lines[i])
+#     vel = GRASS.moving_average(vel, 4)[3:end-1]
+#     int = GRASS.moving_average(int, 4)[3:end-1]
 
-    plt.plot(vel, int)
-end
-plt.show()
+#     plt.plot(vel[3:end-1], int[3:end-1], label=string(i))
+# end
+# plt.legend()
+# plt.show()
 
-
-#=nlines_to_do = 100
+nlines_to_do = [5, 10, 25, 50, 100, 125]
 function std_vs_number_of_lines(snr::T) where T<:Float64
-    #
-
-
     # allocate memory
-    rvs_std = zeros(nlines_to_do)
+    rvs_std = zeros(length(nlines_to_do))
+    rvs_std_decorr = zeros(length(nlines_to_do))
 
     # include more and more lines in ccf
-    for i in 1:nlines_to_do
+    for i in 1:length(nlines_to_do)
         # get lines to include in ccf
-        ls = lines[1:i]
-        ds = depths[1:i]
+        ls = lines[1:nlines_to_do[i]]
+        ds = depths[1:nlines_to_do[i]]
 
         # get view of spectrum
-        wavs_temp, flux_temp = get_lines(wavs, flux, i)
+        wavs_temp, flux_temp = get_lines(wavs, flux, nlines_to_do[i])
 
         # get spectrum at specified snr
         wavs_snr = copy(wavs_temp)
@@ -95,17 +103,27 @@ function std_vs_number_of_lines(snr::T) where T<:Float64
         rvs_std[i] = std(rvs1)
 
         # get ccf bisector
-        bis, int = GRASS.calc_bisector(v_grid, ccf1, nflux=50, top=0.99)
-        bis_inv_slope = GRASS.calc_bisector_inverse_slope(bis, int)
+        vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
 
-        # scatter plot with correlations
-        xdata = rvs1 .- mean(rvs1)
-        ydata = bis_inv_slope .- mean(bis_inv_slope)
+        # vel = GRASS.moving_average(vel, 4)[3:end-1, :]
+        # int = GRASS.moving_average(int, 4)[3:end-1, :]
 
+        bis_inv_slope = GRASS.calc_bisector_inverse_slope(vel, int)
+
+        # data to fit
+        xdata = bis_inv_slope #.- mean(bis_inv_slope)
+        ydata = rvs1 #.- mean(rvs1)
+
+        # perform the fot
         pfit = Polynomials.fit(xdata, ydata, 1)
         xmodel = range(minimum(xdata), maximum(xdata), length=5)
         ymodel = pfit.(xmodel)
 
+        # decorrelate the velocities
+        rvs_to_subtract = pfit.(bis_inv_slope)
+        rvs_std_decorr[i] = std(rvs1 .- rvs_to_subtract)
+
+        # get the slope of the fit to plot
         slope = round(coeffs(pfit)[2], digits=3)
         fit_label = "\$ " .* string(slope) .* "\$"
 
@@ -114,50 +132,61 @@ function std_vs_number_of_lines(snr::T) where T<:Float64
         ax2.scatter(xdata, ydata, c="k", s=2)
         ax2.plot(xmodel, ymodel, ls="--", c="k", label=L"{\rm Slope } \approx\ " * fit_label, lw=2.5)
 
-        ax2.set_xlabel(L"{\rm RV\ - \overline{\rm RV}\ } {\rm (m\ s}^{-1}{\rm )}")
-        ax2.set_ylabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m\ s}^{-1}{\rm )}")
-        ax2.set_title("SNR = " * string(Int(snr)) * ", Nlines = " * string(i))
+        # ax2.set_xlabel(L"{\rm RV\ - \overline{\rm RV}\ } {\rm (m\ s}^{-1}{\rm )}")
+        ax2.set_xlabel(L"{\rm RV\ } {\rm (m\ s}^{-1}{\rm )}")
+        # ax2.set_ylabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m\ s}^{-1}{\rm )}")
+        ax2.set_ylabel(L"{\rm BIS\ } {\rm (m\ s}^{-1}{\rm )}")
+        ax2.set_title("SNR = " * string(Int(snr)) * ", Nlines = " * string(nlines_to_do[i]))
         ax2.legend()
-        ofile = string(joinpath(plotsubdir, "rv_vs_bis_snr_" * string(Int(snr)) * "_lines_" * string(i) * ".pdf"))
+        ofile = string(joinpath(plotsubdir, "rv_vs_bis_snr_" * string(Int(snr)) * "_lines_" * string(nlines_to_do[i]) * ".pdf"))
         fig2.savefig(ofile)
-        plt.clf()
+        plt.clf(); plt.close()
     end
-    return rvs_std
+    return rvs_std, rvs_std_decorr
 end
 
 # snrs to loop over
-snrs_for_lines = range(100.0, 1000.0, step=100.0)
+# snrs_for_lines = vcat(collect(range(100.0, 1000.0, step=200.0)), 2000.0, 5000.0)
+snrs_for_lines = [100.0, 150.0, 200.0, 250.0, 500.0, 750.0, 1000.0]
 
-# set up colors
-pcolors = plt.cm.rainbow(range(0, 1, length=snrs_for_lines))
-rvs_std_out = zeros(nlines_to_do, length(snrs_for_lines))
+# allocate memory for output
+rvs_std_out = zeros(length(nlines_to_do), length(snrs_for_lines))
+rvs_std_decorr_out = zeros(length(nlines_to_do), length(snrs_for_lines))
 
 for i in eachindex(snrs_for_lines)
     # get the stuff
-    out = std_vs_number_of_lines(snrs_for_lines[i])
-    rvs_std_out[:, i] = out
+    rvs_std, rvs_std_decorr = std_vs_number_of_lines(snrs_for_lines[i])
+    rvs_std_out[:, i] = rvs_std
+    rvs_std_decorr_out[:, i] = rvs_std_decorr
 end
 
 # write the data
-jldsave(string(joinpath(data, "rvs_std_out.jld2")), snrs_for_lines=snrs_for_lines, rvs_std_out=rvs_std_out)
+jldsave(string(joinpath(data, "rvs_std_out.jld2")),
+        snrs_for_lines=snrs_for_lines,
+        rvs_std_out=rvs_std_out,
+        rvs_std_decorr_out=rvs_std_decorr_out)
+
+# set up colors
+pcolors = plt.cm.rainbow(range(0, 1, length=length(snrs_for_lines)))
 
 # set up plots
 fig1, ax1 = plt.subplots()
 
 # plot snr vs number of lines
 for i in eachindex(snrs_for_lines)
-    ax1.plot(1:nlines_to_do, rvs_std_out[:,i], label="SNR = " * string(snrs_for_lines[i]), c=pcolors[i,:])
+    ax1.plot(nlines_to_do, rvs_std_out[:,i] .- rvs_std_decorr_out[:,i], label="SNR = " * string(snrs_for_lines[i]), c=pcolors[i,:])
 end
 
 ax1.set_xlabel("Number of lines")
-ax1.set_ylabel("RV RMS (m/s)")
-ax1.set_xscale("log", base=2)
-ax1.set_yscale("log", base=2)
-ax1.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-fig1.savefig(string(joinpath(figures, "std_vs_number_of_lines_same.pdf")))
+ax1.set_ylabel("Reduction in RV RMS (m/s)")
+# ax1.set_xscale("log", base=2)
+# ax1.set_yscale("log", base=2)
+# ax1.legend(loc="upper lef")#, bbox_to_anchor=(1, 0.5))
+# fig1.savefig(string(joinpath(figures, "std_vs_number_of_lines_same.pdf")))
+plt.show()
 plt.clf(); plt.close("all")
 
-=#
+
 
 
 

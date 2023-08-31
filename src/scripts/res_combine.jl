@@ -21,10 +21,10 @@ colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 include(joinpath(abspath(@__DIR__), "paths.jl"))
 const datafile = string(abspath(joinpath(data, "spectra_for_bin.jld2")))
 
-function make_ccf_plots(wavs, flux, lines, depths, title, filename; plot_correlation=true)
+function make_ccf_plots(wavs, flux, lines, depths, res, title, filename; plot_correlation=true)
     # calculate a ccf for one line
     v_grid, ccf1 = calc_ccf(wavs, flux, lines, depths,
-                            7e5, mask_type=EchelleCCFs.TopHatCCFMask,
+                            res, mask_type=EchelleCCFs.TopHatCCFMask,
                             Δv_step=125.0)
     rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1)
     bis, int = GRASS.calc_bisector(v_grid, ccf1, nflux=20)
@@ -130,5 +130,5 @@ for i in eachindex(resolutions)
 
     # make plots
     outfile = string(abspath(joinpath(figures, string(res) * "_rv_vs_bis.pdf")))
-    make_ccf_plots(wavs_out, flux_out, lines[idx], depths[idx], string(res), outfile)
+    make_ccf_plots(wavs_out, flux_out, lines[idx], depths[idx], res, string(res), outfile)
 end

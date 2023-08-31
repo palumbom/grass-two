@@ -18,14 +18,13 @@ mpl.style.use(GRASS.moddir * "fig.mplstyle")
 colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 # set output directory
-outdir = "/storage/work/m/mlp95/grass_output/plots/rms_stuff/"
+outdir = "/storage/work/mlp95/grass_output/plots/rms_stuff/"
 
 # get lines to construct templates
 lp = GRASS.LineProperties()
 names = GRASS.get_name(lp)
 
 # # set up stuff for lines
-# N = 132
 # Nt = 32000
 # lines = collect(range(5400.0, 5500.0, length=length(lp.λrest)))
 # templates = lp.file
@@ -35,7 +34,6 @@ for i in eachindex(lp.λrest)
     println("\t>>> Doing " * names[i])
 
     # set up stuff for synthesis
-    N = 132
     Nt = 32000
     lines = [5576.0881]
     templates = [lp.file[i]]
@@ -48,7 +46,9 @@ for i in eachindex(lp.λrest)
 
     # synthesize spectra
     lambdas1, outspec1 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true)
-    outspec2 = GRASS.add_noise(outspec1, 500.0)
+
+    outspec2 = copy(outspec1)
+    GRASS.add_noise!(outspec2, 500.0)
 
     # compute velocities
     println("\t>>> Calculating CCFs...")

@@ -10,11 +10,11 @@
 #SBATCH --chdir=/storage/home/mlp95/work/grass-two
 #SBATCH --output=/storage/home/mlp95/work/logs/ccfbin.%j.out
 
-echo "Starting job $PBS_JOBNAME"
+echo "About to start: $SLURM_JOB_NAME"
 date
-echo "Job id: $PBS_JOBID"
-echo "About to change into $PBS_O_WORKDIR"
-cd $PBS_O_WORKDIR
+echo "Job id: $SLURM_JOBID"
+echo "About to change into $SLURM_SUBMIT_DIR"
+cd $SLURM_SUBMIT_DIR
 echo "About to start Julia"
 julia -e 'using Pkg; Pkg.activate("."); using CUDA; CUDA.set_runtime_version!("local")'
 julia src/scripts/ccf_bin_data.jl

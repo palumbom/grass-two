@@ -14,7 +14,11 @@ import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
 mpl.style.use(GRASS.moddir * "fig.mplstyle")
 colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
-outdir = "/storage/home/mlp95/work/grass_output/plots/plottos/"
+include(joinpath(abspath(@__DIR__), "paths.jl"))
+outdir = abspath(joinpath(string(figures), "rvs_bis/"))
+if !isdir(outdir)
+    mkdir(outdir)
+end
 
 function round_and_format(num::Float64)
     rounded_num = Int(round(num))

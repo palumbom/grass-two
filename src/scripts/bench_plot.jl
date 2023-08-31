@@ -75,7 +75,7 @@ function plot_scaling(filename; logscale=true)
     end
 
     # axis label stuff
-    ax1.set_xlabel(L"{\rm \#\ of\ res.\ elements}")
+    ax1.set_xlabel(L"{\rm \#\ of\ pixels}")
     ax1.set_ylabel(L"{\rm Synthesis\ time\ (s)}")
     ax2.set_xlabel(L"{\rm Width\ of\ spectrum\ (\AA)}")
     ax1.legend()
