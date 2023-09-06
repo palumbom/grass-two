@@ -31,8 +31,8 @@ line_files = GRASS.get_file(lp)
 # get index of line template I want
 idx = findfirst(x -> contains(x, "FeI_5576"), line_names)
 
-nlines = 133
-lines = collect(range(5200, 5600, length=nlines)) .+ 0.1 .* rand(nlines)
+nlines = 150
+lines = collect(range(5200, 5700, length=nlines)) .+ 0.1 .* rand(nlines)
 depths = repeat([line_depths[idx]], nlines)
 blueshifts = zeros(nlines)
 templates = repeat([line_files[idx]], nlines)

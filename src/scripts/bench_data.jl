@@ -24,12 +24,14 @@ function benchmark_gpu(spec::SpecParams, disk::DiskParams, precision::DataType)
 end
 
 # benchmarking wrapper function
-function bmark_everything(b_cpu, b_gpu, b_gpu32, lines, depths; max_cpu=8)
+function bmark_everything(t_cpu, t_gpu, t_gpu32,
+                          m_cpu, m_gpu, m_gpu32,
+                          lines, depths; max_cpu=8)
     for i in eachindex(lines)
         @printf(">>> Benchmarking %s of %s\n", i, length(lines))
 
         # get number of gpu samplings to do
-        n_gpu_loops = size(b_gpu, 2)
+        n_gpu_loops = size(t_gpu, 2)
 
         # get lines and depths
         lines_i = lines[1:i]
@@ -45,7 +47,9 @@ function bmark_everything(b_cpu, b_gpu, b_gpu32, lines, depths; max_cpu=8)
         if i <= max_cpu
             @printf("\t>>> Performing CPU bench (N=132, Nt=50): ")
             Profile.clear_malloc_data()
-            b_cpu[i] = @belapsed benchmark_cpu($spec, $disk)
+            bm_cpu = @benchmark benchmark_cpu($spec, $disk)
+            t_cpu[i] = minimum(bm_cpu.times) / 1e9
+            m_cpu[i] = minimum(bm_cpu.memory)
             println()
         end
 
@@ -54,7 +58,9 @@ function bmark_everything(b_cpu, b_gpu, b_gpu32, lines, depths; max_cpu=8)
         for j in 1:n_gpu_loops
             Profile.clear_malloc_data()
             CUDA.synchronize()
-            b_gpu[i,j] = @belapsed benchmark_gpu($spec, $disk, $Float64)
+            bm_gpu = @benchmark benchmark_gpu($spec, $disk, $Float64)
+            t_gpu[i,j] = minimum(bm_gpu.times) / 1e9
+            m_gpu[i,j] = minimum(bm_gpu.memory)
             CUDA.synchronize()
         end
         println()
@@ -63,7 +69,9 @@ function bmark_everything(b_cpu, b_gpu, b_gpu32, lines, depths; max_cpu=8)
         for j in 1:n_gpu_loops
             Profile.clear_malloc_data()
             CUDA.synchronize()
-            b_gpu32[i,j] = @belapsed benchmark_gpu($spec, $disk, $Float32)
+            bm_gpu32 = @benchmark benchmark_gpu($spec, $disk, $Float32)
+            t_gpu32[i,j] = minimum(bm_gpu32.times) / 1e9
+            m_gpu32[i,j] = minimum(bm_gpu32.memory)
             CUDA.synchronize()
         end
         println()
@@ -74,7 +82,7 @@ end
 function main()
     # line parameters
     nlines = 24
-    lines = range(5434.5, step=5.0, length=nlines)
+    lines = range(5434.5, step=2.5, length=nlines)
     depths = repeat([0.75], length(lines))
 
     # calculate number of resolution elements per spectrum
@@ -95,11 +103,16 @@ function main()
 
     # allocate memory for benchmark results and run it
     n_gpu_loops = 1
-    max_cpu = minimum([16, length(lines)])
-    b_cpu = similar(lines)
-    b_gpu = zeros(length(lines), n_gpu_loops)
-    b_gpu32 = zeros(length(lines), n_gpu_loops)
-    bmark_everything(b_cpu, b_gpu, b_gpu32, lines, depths, max_cpu=max_cpu)
+    max_cpu = minimum([8, length(lines)])
+    t_cpu = similar(lines)
+    t_gpu = zeros(length(lines), n_gpu_loops)
+    t_gpu32 = zeros(length(lines), n_gpu_loops)
+    m_cpu = similar(lines)
+    m_gpu = zeros(length(lines), n_gpu_loops)
+    m_gpu32 = zeros(length(lines), n_gpu_loops)
+    bmark_everything(t_cpu, t_gpu, t_gpu32,
+                     m_cpu, m_gpu, m_gpu32,
+                     lines, depths, max_cpu=max_cpu)
 
     # write results to disk
     save(datafile,
@@ -107,9 +120,12 @@ function main()
          "nlines", nlines,
          "n_res", n_res,
          "n_lam", n_lam,
-         "b_cpu", b_cpu,
-         "b_gpu", b_gpu,
-         "b_gpu32", b_gpu32)
+         "t_cpu", t_cpu,
+         "t_gpu", t_gpu,
+         "t_gpu32", t_gpu32,
+         "m_cpu", m_cpu,
+         "m_gpu", m_gpu,
+         "m_gpu32", m_gpu32)
     return nothing
 end
 

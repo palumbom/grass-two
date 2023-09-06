@@ -178,18 +178,13 @@ for i in eachindex(snrs_for_lines)
 end
 
 ax1.set_xlabel("Number of lines")
-ax1.set_ylabel("Reduction in RV RMS (m/s)")
+ax1.set_ylabel("Residual RV RMS (m/s)")
 # ax1.set_xscale("log", base=2)
 # ax1.set_yscale("log", base=2)
-# ax1.legend(loc="upper lef")#, bbox_to_anchor=(1, 0.5))
-# fig1.savefig(string(joinpath(figures, "std_vs_number_of_lines_same.pdf")))
+ax1.legend(loc="upper left")#, bbox_to_anchor=(1, 0.5))
+fig1.savefig(string(joinpath(figures, "std_vs_number_of_lines_same.pdf")))
 plt.show()
 plt.clf(); plt.close("all")
-
-
-
-
-
 
 
 

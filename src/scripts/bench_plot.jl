@@ -24,33 +24,43 @@ max_cpu = d["max_cpu"]
 nlines = d["nlines"]
 n_res = d["n_res"]
 n_lam = d["n_lam"]
-b_cpu = d["b_cpu"]
-b_gpu = d["b_gpu"]
-b_gpu32 = d["b_gpu32"]
+t_cpu = d["t_cpu"]
+t_gpu = d["t_gpu"]
+t_gpu32 = d["t_gpu32"]
+m_cpu = d["m_cpu"] * 9.5367431640625e-7
+m_gpu = d["m_gpu"] * 9.5367431640625e-7
+m_gpu32 = d["m_gpu32"]*  9.5367431640625e-7
+
 
 # get mean gpu benchmark
-b_gpu_avg = dropdims(mean(b_gpu, dims=2), dims=2)
-b_gpu_std = dropdims(std(b_gpu, dims=2), dims=2)
+t_gpu_avg = dropdims(mean(t_gpu, dims=2), dims=2)
+t_gpu_std = dropdims(std(t_gpu, dims=2), dims=2)
 
-b_gpu_avg32 = dropdims(mean(b_gpu32, dims=2), dims=2)
-b_gpu_std32 = dropdims(std(b_gpu32, dims=2), dims=2)
+t_gpu_avg32 = dropdims(mean(t_gpu32, dims=2), dims=2)
+t_gpu_std32 = dropdims(std(t_gpu32, dims=2), dims=2)
+
+m_gpu_avg = dropdims(mean(m_gpu, dims=2), dims=2)
+m_gpu_std = dropdims(std(m_gpu, dims=2), dims=2)
+
+m_gpu_avg32 = dropdims(mean(m_gpu32, dims=2), dims=2)
+m_gpu_std32 = dropdims(std(m_gpu32, dims=2), dims=2)
 
 # compute speedup
-speedup = b_cpu[1:max_cpu]./b_gpu_avg[1:max_cpu]
+speedup = t_cpu[1:max_cpu]./t_gpu_avg[1:max_cpu]
 
 # report largest benchmore for double precision gpu
-println(">>> Max GPU benchmark = " * string(maximum(b_gpu_avg)))
+println(">>> Max GPU benchmark = " * string(maximum(t_gpu_avg)))
 
 # plotting function (use globals who cares i don't)
 function plot_scaling(filename; logscale=true)
     # create plotting objects
-    fig, ax1 = plt.subplots()
-    ax2 = ax1.twiny()
+    fig, (ax1,ax2) = plt.subplots(figsize=(6.4,9.6), nrows=2, ncols=1, sharex=true)
+    ax1_t = ax1.twiny()
 
     # log scale it
     if logscale
         ax1.set_yscale("symlog")
-        ax2.set_yscale("symlog")
+        ax1_t.set_yscale("symlog")
         scale = "logscale"
     else
         scale = "linscale"
@@ -58,15 +68,15 @@ function plot_scaling(filename; logscale=true)
 
     # plot on ax1
     ms = 7.5
-    ax1.plot(n_res[1:max_cpu], b_cpu[1:max_cpu], marker="o", ms=ms, c="k", label=L"{\rm CPU\ (Float64)}")
-    ax1.plot(n_res, b_gpu_avg, marker="s", ms=ms, c=colors[1], label=L"{\rm GPU\ (Float64)}")
-    ax1.plot(n_res, b_gpu_avg32, marker="^", ms=ms, c=colors[2], label=L"{\rm GPU\ (Float32)}")
+    ax1.plot(n_res[1:max_cpu], t_cpu[1:max_cpu], marker="o", ms=ms, c="k", label=L"{\rm CPU\ (Float64)}")
+    ax1.plot(n_res, t_gpu_avg, marker="s", ms=ms, c=colors[1], label=L"{\rm GPU\ (Float64)}")
+    ax1.plot(n_res, t_gpu_avg32, marker="^", ms=ms, c=colors[2], label=L"{\rm GPU\ (Float32)}")
 
     # plot on twin axis
-    ax2.plot(n_lam[1:max_cpu], b_cpu[1:max_cpu], marker="o", ms=ms, c="k")
-    ax2.plot(n_lam, b_gpu_avg, marker="s", ms=ms, c=colors[1])
-    ax2.plot(n_lam, b_gpu_avg32, marker="^", ms=ms, c=colors[2])
-    ax2.grid(false)
+    ax1_t.plot(n_lam[1:max_cpu], t_cpu[1:max_cpu], marker="o", ms=ms, c="k")
+    ax1_t.plot(n_lam, t_gpu_avg, marker="s", ms=ms, c=colors[1])
+    ax1_t.plot(n_lam, t_gpu_avg32, marker="^", ms=ms, c=colors[2])
+    ax1_t.grid(false)
 
     # minor tick locator
     if logscale
@@ -74,12 +84,19 @@ function plot_scaling(filename; logscale=true)
         ax1.yaxis.set_minor_locator(locmin)
     end
 
+    # plot memory on axis
+    ax2.plot(n_res[1:max_cpu], m_cpu[1:max_cpu], marker="o", ms=ms, c="k")
+    ax2.plot(n_res, m_gpu_avg, marker="s", ms=ms, c=colors[1])
+    ax2.plot(n_res, m_gpu_avg32, marker="^", ms=ms, c=colors[2])
+
     # axis label stuff
-    ax1.set_xlabel(L"{\rm \#\ of\ pixels}")
-    ax1.set_ylabel(L"{\rm Synthesis\ time\ (s)}")
-    ax2.set_xlabel(L"{\rm Width\ of\ spectrum\ (\AA)}")
+    ax2.set_xlabel(L"{\rm \#\ of\ pixels}")
+    ax1.set_ylabel(L"{\rm Synthesis\ Time\ (s)}")
+    ax2.set_ylabel(L"{\rm Memory\ Allocated\ (MiB)}")
+    ax1_t.set_xlabel(L"{\rm Width\ of\ spectrum\ (\AA)}")
     ax1.legend()
     fig.tight_layout()
+    fig.subplots_adjust(hspace=0.025)
     fig.savefig(filename)
     plt.clf(); plt.close()
     return nothing
