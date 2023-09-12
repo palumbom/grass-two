@@ -6,7 +6,7 @@
 #SBATCH --gpus-per-task=1
 #SBATCH --mem-per-cpu=16GB
 #SBATCH --time=48:00:00
-#SBATCH --job-name=GRASS_noise
+#SBATCH --job-name=noise
 #SBATCH --chdir=/storage/home/mlp95/work/grass-two
 #SBATCH --output=/storage/home/mlp95/work/logs/noise.%j.out
 

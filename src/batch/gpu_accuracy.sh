@@ -6,7 +6,7 @@
 #SBATCH --gpus-per-task=1
 #SBATCH --mem-per-cpu=16GB
 #SBATCH --time=1:00:00
-#SBATCH --job-name=GRASS_accuracy
+#SBATCH --job-name=gpu_accuracy
 #SBATCH --chdir=/storage/home/mlp95/work/grass-two
 #SBATCH --output=/storage/home/mlp95/work/logs/accuracy.%j.out
 

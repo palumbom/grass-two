@@ -31,15 +31,15 @@ line_files = GRASS.get_file(lp)
 # get index of line template I want
 idx = findfirst(x -> contains(x, "FeI_5576"), line_names)
 
-nlines = 150
-lines = collect(range(5200, 5700, length=nlines)) .+ 0.1 .* rand(nlines)
+# parameters for spectrum
+nlines = 250
+lines = collect(range(5000, 6000, length=nlines)) .+ 0.1 .* rand(nlines)
 depths = repeat([line_depths[idx]], nlines)
 blueshifts = zeros(nlines)
 templates = repeat([line_files[idx]], nlines)
 
 # synthesize the spectra
-N = 132
-Nt = 800
+Nt = 1000
 variability = trues(length(lines))
 resolution = 7e5
 seed_rng = true

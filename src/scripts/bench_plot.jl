@@ -48,13 +48,19 @@ m_gpu_std32 = dropdims(std(m_gpu32, dims=2), dims=2)
 # compute speedup
 speedup = t_cpu[1:max_cpu]./t_gpu_avg[1:max_cpu]
 
+# plot the speedup
+plotfile0 = string(abspath(joinpath(figures, "speedup.pdf")))
+plt.plot(n_res[1:max_cpu], speedup)
+plt.savefig(plotfile0)
+
 # report largest benchmore for double precision gpu
 println(">>> Max GPU benchmark = " * string(maximum(t_gpu_avg)))
 
 # plotting function (use globals who cares i don't)
 function plot_scaling(filename; logscale=true)
     # create plotting objects
-    fig, (ax1,ax2) = plt.subplots(figsize=(6.4,9.6), nrows=2, ncols=1, sharex=true)
+    # fig, (ax1,ax2) = plt.subplots(figsize=(6.4,9.0), nrows=2, ncols=1, sharex=true)
+    fig, ax1 = plt.subplots()
     ax1_t = ax1.twiny()
 
     # log scale it
@@ -69,13 +75,13 @@ function plot_scaling(filename; logscale=true)
     # plot on ax1
     ms = 7.5
     ax1.plot(n_res[1:max_cpu], t_cpu[1:max_cpu], marker="o", ms=ms, c="k", label=L"{\rm CPU\ (Float64)}")
-    ax1.plot(n_res, t_gpu_avg, marker="s", ms=ms, c=colors[1], label=L"{\rm GPU\ (Float64)}")
     ax1.plot(n_res, t_gpu_avg32, marker="^", ms=ms, c=colors[2], label=L"{\rm GPU\ (Float32)}")
+    ax1.plot(n_res, t_gpu_avg, marker="s", ms=ms, c=colors[1], label=L"{\rm GPU\ (Float64)}")
 
     # plot on twin axis
     ax1_t.plot(n_lam[1:max_cpu], t_cpu[1:max_cpu], marker="o", ms=ms, c="k")
-    ax1_t.plot(n_lam, t_gpu_avg, marker="s", ms=ms, c=colors[1])
     ax1_t.plot(n_lam, t_gpu_avg32, marker="^", ms=ms, c=colors[2])
+    ax1_t.plot(n_lam, t_gpu_avg, marker="s", ms=ms, c=colors[1])
     ax1_t.grid(false)
 
     # minor tick locator
@@ -84,15 +90,16 @@ function plot_scaling(filename; logscale=true)
         ax1.yaxis.set_minor_locator(locmin)
     end
 
-    # plot memory on axis
-    ax2.plot(n_res[1:max_cpu], m_cpu[1:max_cpu], marker="o", ms=ms, c="k")
-    ax2.plot(n_res, m_gpu_avg, marker="s", ms=ms, c=colors[1])
-    ax2.plot(n_res, m_gpu_avg32, marker="^", ms=ms, c=colors[2])
+    # # plot memory on axis
+    # ax2.plot(n_res[1:max_cpu], m_cpu[1:max_cpu], marker="o", ms=ms, c="k")
+    # ax2.plot(n_res, m_gpu_avg, marker="s", ms=ms, c=colors[1])
+    # ax2.plot(n_res, m_gpu_avg32, marker="^", ms=ms, c=colors[2])
 
     # axis label stuff
-    ax2.set_xlabel(L"{\rm \#\ of\ pixels}")
+    ax1.set_xlabel(L"{\rm \#\ of\ pixels}")
+    # ax2.set_xlabel(L"{\rm \#\ of\ pixels}")
     ax1.set_ylabel(L"{\rm Synthesis\ Time\ (s)}")
-    ax2.set_ylabel(L"{\rm Memory\ Allocated\ (MiB)}")
+    # ax2.set_ylabel(L"{\rm Memory\ Allocated\ (MiB)}")
     ax1_t.set_xlabel(L"{\rm Width\ of\ spectrum\ (\AA)}")
     ax1.legend()
     fig.tight_layout()

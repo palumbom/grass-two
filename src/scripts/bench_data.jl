@@ -81,8 +81,8 @@ end
 
 function main()
     # line parameters
-    nlines = 24
-    lines = range(5434.5, step=2.5, length=nlines)
+    nlines = 32
+    lines = range(5434.5, step=4.0, length=nlines)
     depths = repeat([0.75], length(lines))
 
     # calculate number of resolution elements per spectrum
@@ -91,7 +91,7 @@ function main()
     for i in eachindex(lines)
         # calculate wavelength coverage
         lines1 = lines[1:i]
-        coverage = (minimum(lines1) - 0.75, maximum(lines1) + 0.75)
+        coverage = (minimum(lines1) - 2.0, maximum(lines1) + 2.0)
 
         # generate Delta ln lambda
         Δlnλ = (1.0 / 7e5)
@@ -103,7 +103,7 @@ function main()
 
     # allocate memory for benchmark results and run it
     n_gpu_loops = 1
-    max_cpu = minimum([8, length(lines)])
+    max_cpu = minimum([32, length(lines)])
     t_cpu = similar(lines)
     t_gpu = zeros(length(lines), n_gpu_loops)
     t_gpu32 = zeros(length(lines), n_gpu_loops)
