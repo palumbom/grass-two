@@ -97,11 +97,16 @@ end
 θe = disk.θe
 θc = disk.θc
 R_x = disk.R_x
+R_y = disk.R_y
+R_z = disk.R_z
 
 # get color scalar mappable
-dat = wts_gpu ./ maximum(wts_gpu) # z_rot_gpu .* 3e8
-# cmap = plt.cm.seismic
+dat = wts_gpu ./ maximum(wts_gpu)
 cmap = plt.cm.inferno
+
+# dat = z_rot_gpu .* 3e8
+# cmap = plt.cm.seismic
+
 norm = mpl.colors.Normalize(vmin=minimum(dat), vmax=maximum(dat))
 smap = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 
@@ -135,10 +140,10 @@ for i in 1:length(ϕe)-1
             z[k] = x0 * R_x[3,1] + y0 * R_x[3,2] + z0 * R_x[3,3]
         end
 
-        idx = y .>= 0
+        idx = z .>= 0
         if any(idx)
-            ax.plot(x[idx], z[idx], color="k", lw=1)
-            ax.fill(x[idx], z[idx], c=smap.to_rgba(dat[i,j]))
+            ax.plot(x[idx], y[idx], color="k", lw=1)
+            ax.fill(x[idx], y[idx], c=smap.to_rgba(dat[i,j]))
         end
     end
 end
@@ -168,9 +173,16 @@ for i in eachindex(longitude)
     push!(z_eq, z)
 end
 
+# sort the values on increasing x
+idx_eq = sortperm(x_eq)
+x_eq = x_eq[idx_eq]
+y_eq = y_eq[idx_eq]
+z_eq = z_eq[idx_eq]
+
+idx_eq = z_eq .> 0.0
+
 # plot the equator
-idx = y_eq .> 0.0
-ax.plot(x_eq[idx], z_eq[idx], color="white", ls="--", zorder=3, alpha=0.75)
+ax.plot(x_eq[idx_eq], y_eq[idx_eq], color="white", ls="--", zorder=3, alpha=0.75)
 
 # get meridians
 latitude = deg2rad.(range(-89.0, 89.0, length=200))
@@ -194,8 +206,8 @@ for j in eachindex(longitude)
     z = x0 .* R_x[3,1] .+ y0 .* R_x[3,2] .+ z0 .* R_x[3,3]
 
     # plot the meridian
-    idx = y .> 0.0
-    ax.plot(x[idx], z[idx], color="white", ls="--", zorder=3, alpha=0.75)
+    idx = z .> 0.0
+    ax.plot(x[idx], y[idx], color="white", ls="--", zorder=3, alpha=0.75)
 end
 
 ax.set_xlabel(L"\Delta {\rm x\ [Stellar\ Radii]}")
@@ -206,6 +218,7 @@ cb = fig.colorbar(smap, ax=ax, fraction=0.1, shrink=0.8)
 # cb.set_ticklabels([])
 # cb.set_ticks([])
 cb.set_label(L"{\rm Weighted\ Relative\ Intensity}")
-fig.savefig(plotfile)
+# fig.savefig(plotfile)
+plt.show()
 plt.clf(); plt.close();
 
