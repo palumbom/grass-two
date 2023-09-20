@@ -75,13 +75,13 @@ function plot_scaling(filename; logscale=true)
     # plot on ax1
     ms = 7.5
     ax1.plot(n_res[1:max_cpu], t_cpu[1:max_cpu], marker="o", ms=ms, c="k", label=L"{\rm CPU\ (Float64)}")
-    ax1.plot(n_res, t_gpu_avg32, marker="^", ms=ms, c=colors[2], label=L"{\rm GPU\ (Float32)}")
-    ax1.plot(n_res, t_gpu_avg, marker="s", ms=ms, c=colors[1], label=L"{\rm GPU\ (Float64)}")
+    ax1.plot(n_res, t_gpu_avg32, alpha=1.0, marker="^", mec="k", ms=ms, c=colors[2], label=L"{\rm GPU\ (Float32)}")
+    ax1.plot(n_res, t_gpu_avg, alpha=0.66, marker="s", mec="k", ms=ms, c=colors[1], label=L"{\rm GPU\ (Float64)}")
 
     # plot on twin axis
     ax1_t.plot(n_lam[1:max_cpu], t_cpu[1:max_cpu], marker="o", ms=ms, c="k")
-    ax1_t.plot(n_lam, t_gpu_avg32, marker="^", ms=ms, c=colors[2])
-    ax1_t.plot(n_lam, t_gpu_avg, marker="s", ms=ms, c=colors[1])
+    ax1_t.plot(n_lam, t_gpu_avg32, alpha=1.0, marker="^", mec="k", ms=ms, c=colors[2])
+    ax1_t.plot(n_lam, t_gpu_avg, alpha=0.66, marker="s", mec="k", ms=ms, c=colors[1])
     ax1_t.grid(false)
 
     # minor tick locator

@@ -214,11 +214,9 @@ ax.set_xlabel(L"\Delta {\rm x\ [Stellar\ Radii]}")
 ax.set_ylabel(L"\Delta {\rm y\ [Stellar\ Radii]}")
 ax.set_aspect("equal")
 ax.grid(false)
+ax.invert_xaxis()
 cb = fig.colorbar(smap, ax=ax, fraction=0.1, shrink=0.8)
-# cb.set_ticklabels([])
-# cb.set_ticks([])
 cb.set_label(L"{\rm Weighted\ Relative\ Intensity}")
-# fig.savefig(plotfile)
-plt.show()
+fig.savefig(plotfile)
 plt.clf(); plt.close();
 

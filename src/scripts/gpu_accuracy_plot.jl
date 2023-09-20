@@ -87,7 +87,7 @@ ax1.set_ylim(0.15, 1.05)
 
 # do manual formatting of tick labels since the default is ROUGH
 if maximum(abs.(resids64)) < 1e-13
-    ax2.set_ylim(-1.6e-14, 1.6e-14)
+    ax2.set_ylim(-1.1e-14, 1.1e-14)
     ax2.ticklabel_format(axis="y", useOffset=true, style="sci")
     ax2.yaxis.offsetText.set_visible(false)
     ax2.set_ylabel(L"({\rm Flux}_{\rm CPU} - {\rm Flux}_{\rm GPU}) \times 10^{-14}", fontsize=15)
