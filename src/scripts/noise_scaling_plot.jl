@@ -106,7 +106,7 @@ end
             wavs_temp, flux_temp = get_lines(wavs, flux, nlines_to_do[i])
 
             # get spectrum at specified snr
-            wavs_snr = copy(wavs_temp)
+            wavs_snr = wavs_temp
             flux_snr = copy(flux_temp)
             GRASS.add_noise!(flux_snr, snr)
 
@@ -118,9 +118,11 @@ end
             # get ccf bisector
             vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
 
+            # # smooth the bisector
             # vel = GRASS.moving_average(vel, 4)[3:end-1, :]
             # int = GRASS.moving_average(int, 4)[3:end-1, :]
 
+            # calc bisector inverse slope
             bis_inv_slope = GRASS.calc_bisector_inverse_slope(vel, int)
 
             # data to fit
