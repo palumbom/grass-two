@@ -18,6 +18,5 @@ cd $SLURM_SUBMIT_DIR
 echo "About to start Julia"
 julia -e 'using Pkg; Pkg.activate("."); using CUDA; CUDA.set_runtime_version!("local")'
 julia src/scripts/noise_scaling_data.jl
-# julia src/scripts/noise_scaling_plot.jl
 echo "Julia exited"
 date

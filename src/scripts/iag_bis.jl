@@ -17,12 +17,11 @@ mpl.style.use(GRASS.moddir * "fig.mplstyle")
 colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 # get command line args and output directories
-run, plot = parse_args(ARGS)
-grassdir, plotdir, datadir = check_plot_dirs()
+include(joinpath(abspath(@__DIR__), "paths.jl"))
+plotdir = string(abspath(joinpath(figures, "iag_comparison")))
 
-outdir = plotdir * "iag_comparison/"
-if !isdir(outdir)
-    mkdir(outdir)
+if !isdir(plotdir)
+    mkdir(plotdir)
 end
 
 # decide whether to use gpu
@@ -128,6 +127,8 @@ end
 
 # figure 3 -- compare synthetic and IAG spectra + bisectors
 function main()
+    @assert CUDA.functional()
+
     # get data
     lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
     files = GRASS.get_file(lp)
@@ -349,7 +350,7 @@ function main()
 
             # save the plot
             fig.subplots_adjust(wspace=0.05)
-            fig.savefig(joinpath(outdir, line_name * "_line.pdf"))
+            fig.savefig(joinpath(plotdir, line_name * "_line.pdf"))
             plt.clf(); plt.close()
 
             # plot the bisectors
@@ -385,7 +386,7 @@ function main()
 
             # save the plot
             fig.subplots_adjust(hspace=0.05)
-            fig.savefig(joinpath(outdir, line_name * "_bisector.pdf"))
+            fig.savefig(joinpath(plotdir, line_name * "_bisector.pdf"))
             plt.clf(); plt.close()
             return nothing
         end
@@ -394,6 +395,4 @@ function main()
     return nothing
 end
 
-if (run | plot)
-    main()
-end
+main()

@@ -29,6 +29,7 @@ PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 RvSpectML = "1f61ac2c-3a1c-440a-925a-2707197041c8"
+SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 TemporalGPs = "e155a3c4-0841-43e1-8b83-a0e4f03cc18f"
 
