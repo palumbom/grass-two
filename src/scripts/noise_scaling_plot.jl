@@ -1,12 +1,18 @@
-# imports
+# get stuff precompiled on the main process
 using Distributed
 Pkg.instantiate()
 Pkg.precompile()
 sleep(5)
+
+# add processes
+if isone(nprocs())
+    addprocs(7)
+end
+
+# get libraries load everywhere
 @everywhere begin
     using Pkg; Pkg.activate(".")
     using JLD2
-    using CUDA
     using GRASS
     using Printf
     using FileIO
@@ -66,31 +72,6 @@ end
     end
 end
 
-# # TODO do they not match or is this numerical noise????
-# for i in 1:3
-#     # get just one line
-#     if i == 2
-#         wavs_temp, flux_temp = get_one_line(wavs, flux, i, t=12)
-#     else
-#         wavs_temp, flux_temp = get_one_line(wavs, flux, i, t=1)
-#     end
-
-#     # ccf
-#     ls = [lines[i]]
-#     ds = [maximum(flux_temp[:,1]) .- minimum(flux_temp[:,1])]
-#     v_grid, ccf1 = calc_ccf(wavs_temp, flux_temp, ls, ds, 7e5, Δv_step=100.0)
-
-#     # get bisector
-#     vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.95)
-
-#     vel = GRASS.moving_average(vel, 4)[3:end-1]
-#     int = GRASS.moving_average(int, 4)[3:end-1]
-
-#     plt.plot(vel[3:end-1], int[3:end-1], label=string(i))
-# end
-# plt.legend()
-# plt.show()
-
 @everywhere begin
     function std_vs_number_of_lines(nlines_to_do::AbstractArray{Int,1},
                                     rvs_std::AbstractArray{T,1},
@@ -119,23 +100,27 @@ end
             vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
 
             # # smooth the bisector
-            # vel = GRASS.moving_average(vel, 4)[3:end-1, :]
-            # int = GRASS.moving_average(int, 4)[3:end-1, :]
+            # vel = GRASS.moving_average(vel, 4)
+            # int = GRASS.moving_average(int, 4)
 
-            # calc bisector inverse slope
+            # calc bisector summary statistics
             bis_inv_slope = GRASS.calc_bisector_inverse_slope(vel, int)
+            bis_span = GRASS.calc_bisector_span(vel, int)
+            bis_slope = GRASS.calc_bisector_slope(vel, int)
+            bis_curve = GRASS.calc_bisector_curvature(vel, int)
+            bis_bot = GRASS.calc_bisector_bottom(vel, int, rvs1)
 
             # data to fit
-            xdata = bis_inv_slope #.- mean(bis_inv_slope)
-            ydata = rvs1 #.- mean(rvs1)
+            xdata = bis_inv_slope
+            ydata = rvs1
 
-            # perform the fot
+            # perform the fit
             pfit = Polynomials.fit(xdata, ydata, 1)
             xmodel = range(minimum(xdata), maximum(xdata), length=5)
             ymodel = pfit.(xmodel)
 
             # decorrelate the velocities
-            rvs_to_subtract = pfit.(bis_inv_slope)
+            rvs_to_subtract = pfit.(xdata)
             rvs_std_decorr[i] = std(rvs1 .- rvs_to_subtract)
 
             # plot
@@ -177,8 +162,8 @@ rvs_std_decorr_out = SharedArray(zeros(length(nlines_to_do), length(snrs_for_lin
     @show i
 
     # get views of output arrays
-    v1 = view(rvs_std_out, i, :)
-    v2 = view(rvs_std_decorr_out, i, :)
+    v1 = view(rvs_std_out, :, i)
+    v2 = view(rvs_std_decorr_out, :, i)
 
     # get the stuff
     std_vs_number_of_lines(nlines_to_do, v1, v2, snrs_for_lines[i])
@@ -190,28 +175,68 @@ jldsave(string(joinpath(data, "rvs_std_out.jld2")),
         rvs_std_out=Array(rvs_std_out),
         rvs_std_decorr_out=Array(rvs_std_decorr_out))
 
-# set up colors
+# set up colors for plots
 pcolors = plt.cm.rainbow(range(0, 1, length=length(snrs_for_lines)))
 
 # set up plots
-fig1, ax1 = plt.subplots()
+fig1, ax1 = plt.subplots(figsize=(7.2,4.8))
 
 # plot snr vs number of lines
 for i in eachindex(snrs_for_lines)
-    # ax1.plot(nlines_to_do, rvs_std_out[:,i] .- rvs_std_decorr_out[:,i], label="SNR = " * string(snrs_for_lines[i]), c=pcolors[i,:])
     ax1.plot(nlines_to_do, rvs_std_out[:,i], label="SNR = " * string(snrs_for_lines[i]), c=pcolors[i,:])
 end
 
-ax1.set_xlabel("Number of lines")
-ax1.set_ylabel("Residual RV RMS (m/s)")
-# ax1.set_xscale("log", base=2)
-# ax1.set_yscale("log", base=2)
-ax1.legend(loc="upper left")#, bbox_to_anchor=(1, 0.5))
+# set axis stuff
+ax1.set_xlabel(L"{\rm Number\ of\ lines\ in\ CCF}")
+ax1.set_ylabel(L"{\rm RV\ RMS\ (m\ s}^{-1} {\rm )}")
+ax1.set_xscale("log", base=2)
+ax1.set_yscale("log", base=2)
+ax1.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
 fig1.savefig(string(joinpath(figures, "std_vs_number_of_lines_same.pdf")))
-plt.show()
+plt.clf(); plt.close("all")
+
+# set up plots
+fig1, ax1 = plt.subplots(figsize=(7.2,4.8))
+
+# plot snr vs number of lines
+for i in eachindex(snrs_for_lines)
+    ax1.plot(nlines_to_do, rvs_std_out[:,i] .- rvs_std_decorr_out[:,i], label="SNR = " * string(snrs_for_lines[i]), c=pcolors[i,:])
+end
+
+# set axis stuff
+ax1.set_xlabel(L"{\rm Number\ of\ lines\ in\ CCF}")
+ax1.set_ylabel(L"{\rm Reduction\ in\ RV\ RMS\ (m\ s}^{-1} {\rm )}")
+ax1.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
+fig1.savefig(string(joinpath(figures, "reduction_std_vs_number_of_lines_same.pdf")))
+# plt.show()
 plt.clf(); plt.close("all")
 
 
+
+# # TODO do they not match or is this numerical noise????
+# for i in 1:3
+#     # get just one line
+#     if i == 2
+#         wavs_temp, flux_temp = get_one_line(wavs, flux, i, t=12)
+#     else
+#         wavs_temp, flux_temp = get_one_line(wavs, flux, i, t=1)
+#     end
+
+#     # ccf
+#     ls = [lines[i]]
+#     ds = [maximum(flux_temp[:,1]) .- minimum(flux_temp[:,1])]
+#     v_grid, ccf1 = calc_ccf(wavs_temp, flux_temp, ls, ds, 7e5, Δv_step=100.0)
+
+#     # get bisector
+#     vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.95)
+
+#     vel = GRASS.moving_average(vel, 4)[3:end-1]
+#     int = GRASS.moving_average(int, 4)[3:end-1]
+
+#     plt.plot(vel[3:end-1], int[3:end-1], label=string(i))
+# end
+# plt.legend()
+# plt.show()
 
 
 

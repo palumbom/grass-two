@@ -34,8 +34,8 @@ function bmark_everything(t_cpu, t_gpu, t_gpu32,
         n_gpu_loops = size(t_gpu, 2)
 
         # get lines and depths
-        lines_i = lines[1:i]
-        depths_i = depths[1:i]
+        lines_i = view(lines, 1:i)
+        depths_i = view(depths, 1:i)
         templates_i = repeat(["FeI_5434"], length(lines_i))
         resolution_i = 7e5
 

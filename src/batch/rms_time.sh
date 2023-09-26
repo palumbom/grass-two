@@ -16,7 +16,7 @@ echo "Job id: $SLURM_JOBID"
 echo "About to change into $SLURM_SUBMIT_DIR"
 cd $SLURM_SUBMIT_DIR
 echo "About to start Julia"
-julia -e 'using Pkg; Pkg.activate("."); using CUDA; CUDA.set_runtime_version!("local")'
+## julia -e 'using Pkg; Pkg.activate("."); using CUDA; CUDA.set_runtime_version!("local")'
 julia src/scripts/rms_time.jl
 echo "Julia exited"
 date

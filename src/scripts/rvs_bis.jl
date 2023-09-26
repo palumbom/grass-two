@@ -156,17 +156,23 @@ for (idx, file) in enumerate(lp.file)
                                 Δv_step=125.0)
         rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1)
 
-        # calculate bisector and BIS
+        # calculate bisector
         bis, int = GRASS.calc_bisector(v_grid, ccf1, nflux=50, top=0.99)
+
+        # smooth it
+        bis = GRASS.moving_average(bis, 4)
+        int = GRASS.moving_average(int, 4)
+
+        # get BIS
         bis_inv_slope = GRASS.calc_bisector_inverse_slope(bis, int)
 
         # subtract off mean
-        xdata = rvs1 .- mean(rvs1)
-        ydata = bis_inv_slope .- mean(bis_inv_slope)
+        xdata = bis_inv_slope .- mean(bis_inv_slope)
+        ydata = rvs1 .- mean(rvs1)
 
         # fit to the BIS
         pfit = Polynomials.fit(xdata, ydata, 1)
-        xmodel = range(-1.15, 1.15, length=5)
+        xmodel = range(minimum(xdata), maximum(xdata), length=5)
         ymodel = pfit.(xmodel)
 
         # get the slope of the fit
@@ -218,8 +224,8 @@ for (idx, file) in enumerate(lp.file)
         ax.set_xticks([-1, -0.5, 0.0, 0.5, 1.0])
         ax.set_yticks([-1, -0.5, 0.0, 0.5, 1.0])
     end
-    fig2.supxlabel(L"{\rm RV\ - \overline{\rm RV}\ } {\rm (m\ s}^{-1}{\rm )}", fontsize=title_font)#, x=0.55, y=0.05)
-    fig2.supylabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m\ s}^{-1}{\rm )}", fontsize=title_font)#, x=0.03, y=0.52)
+    fig2.supxlabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m\ s}^{-1}{\rm )}", fontsize=title_font)#, x=0.03, y=0.52)
+    fig2.supylabel(L"{\rm RV\ - \overline{\rm RV}\ } {\rm (m\ s}^{-1}{\rm )}", fontsize=title_font)#, x=0.55, y=0.05)
     fig2.suptitle(title, fontsize=title_font, x=0.5, y=0.925)
     fig2.subplots_adjust(hspace=0.025, wspace=0.025)
     fig2.savefig(outdir * line_names[idx] * "_rv_vs_bis.pdf")
