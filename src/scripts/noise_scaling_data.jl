@@ -39,8 +39,8 @@ line_files = GRASS.get_file(lp)
 idx = findfirst(x -> contains(x, template), line_names)
 
 # parameters for spectrum
-nlines = 250
-lines = collect(range(4800, 6200, length=nlines)) .+ 0.1 .* rand(nlines)
+nlines = 300
+lines = collect(range(4800, 6300, length=nlines)) .+ 0.1 .* rand(nlines)
 depths = repeat([line_depths[idx]], nlines)
 blueshifts = zeros(nlines)
 templates = repeat([line_files[idx]], nlines)
