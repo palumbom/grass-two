@@ -32,12 +32,21 @@ end
     colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 end
 
+# get the name of template from the command line args
+@everywhere begin
+    template_idx = ARGS[1]
+    lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
+    line_files = GRASS.get_file(lp)
+    template = line_files[template_idx]
+end
+
 # get command line args and output directories
 @everywhere begin
     include(joinpath(abspath(@__DIR__), "paths.jl"))
     plotsubdir = string(joinpath(figures, "snr_plots"))
-    datafile = string(abspath(joinpath(data, "picket_fence.jld2")))
+    datafile = string(abspath(joinpath(data, template * "_picket_fence.jld2")))
 end
+
 if !isdir(plotsubdir)
     mkdir(plotsubdir)
 end
@@ -99,9 +108,9 @@ end
             # get ccf bisector
             vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
 
-            # # smooth the bisector
-            # vel = GRASS.moving_average(vel, 4)
-            # int = GRASS.moving_average(int, 4)
+            # smooth the bisector
+            vel = GRASS.moving_average(vel, 4)
+            int = GRASS.moving_average(int, 4)
 
             # calc bisector summary statistics
             bis_inv_slope = GRASS.calc_bisector_inverse_slope(vel, int)
@@ -170,10 +179,15 @@ rvs_std_decorr_out = SharedArray(zeros(length(nlines_to_do), length(snrs_for_lin
 end
 
 # write the data
-jldsave(string(joinpath(data, "rvs_std_out.jld2")),
+jldsave(string(joinpath(data, template * "_rvs_std_out.jld2")),
         snrs_for_lines=snrs_for_lines,
         rvs_std_out=Array(rvs_std_out),
         rvs_std_decorr_out=Array(rvs_std_decorr_out))
+
+# d = load(string(joinpath(data, "rvs_std_out.jld2")))
+# snrs_for_lines = d["snrs_for_lines"]
+# rvs_std_out = d["rvs_std_out"]
+# rvs_std_decorr_out = d["rvs_std_decorr_out"]
 
 # set up colors for plots
 pcolors = plt.cm.rainbow(range(0, 1, length=length(snrs_for_lines)))
@@ -192,7 +206,7 @@ ax1.set_ylabel(L"{\rm RV\ RMS\ (m\ s}^{-1} {\rm )}")
 ax1.set_xscale("log", base=2)
 ax1.set_yscale("log", base=2)
 ax1.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
-fig1.savefig(string(joinpath(figures, "std_vs_number_of_lines_same.pdf")))
+fig1.savefig(string(joinpath(plotsubdir, template * "_std_vs_number_of_lines.pdf")))
 plt.clf(); plt.close("all")
 
 # set up plots
@@ -200,17 +214,16 @@ fig1, ax1 = plt.subplots(figsize=(7.2,4.8))
 
 # plot snr vs number of lines
 for i in eachindex(snrs_for_lines)
-    ax1.plot(nlines_to_do, rvs_std_out[:,i] .- rvs_std_decorr_out[:,i], label="SNR = " * string(snrs_for_lines[i]), c=pcolors[i,:])
+    dat = (rvs_std_out[:,i] .- rvs_std_decorr_out[:,i]) ./ rvs_std_out[:,i]
+    ax1.plot(nlines_to_do, dat .* 100, label="SNR = " * string(snrs_for_lines[i]), c=pcolors[i,:])
 end
 
 # set axis stuff
 ax1.set_xlabel(L"{\rm Number\ of\ lines\ in\ CCF}")
-ax1.set_ylabel(L"{\rm Reduction\ in\ RV\ RMS\ (m\ s}^{-1} {\rm )}")
+ax1.set_ylabel(L"{\rm \% \ Improvement\ in\ RV\ RMS}")
 ax1.legend(bbox_to_anchor=(1.04, 0.5), loc="center left", borderaxespad=0)
-fig1.savefig(string(joinpath(figures, "reduction_std_vs_number_of_lines_same.pdf")))
-# plt.show()
+fig1.savefig(string(joinpath(plotsubdir, template * "_improvement_vs_number_of_lines_same.pdf")))
 plt.clf(); plt.close("all")
-
 
 
 # # TODO do they not match or is this numerical noise????
@@ -237,48 +250,3 @@ plt.clf(); plt.close("all")
 # end
 # plt.legend()
 # plt.show()
-
-
-
-
-#=
-# collect lines
-lines = collect(lines)
-
-# isolate a chunk of spectrum around a good line
-idx = findall(x -> occursin.("FeI_5576", x), templates)
-line_centers = sort!(lines[idx])
-line_center = line_centers[5]
-
-buffer = 1.0
-idx1 = findlast(x -> x .<= line_center - buffer, wavs)
-idx2 = findlast(x -> x .<= line_center + buffer, wavs)
-
-# take isolated view
-wavs_iso = copy(view(wavs, idx1:idx2))
-flux_iso = copy(view(flux, idx1:idx2, :))
-
-# make noises to loop over
-SNRs = range(100.0, 1000.0, step=10.0)
-
-# # allocate memory for rvs stuff
-# rv_std = zeros(length(SNRs))
-
-# # loop over them
-# flux_noise = similar(flux_iso)
-# for i in eachindex(SNRs)
-#     # copy over SNR infinity flux
-#     flux_noise .= flux_iso
-
-#     # add noise
-#     GRASS.add_noise!(flux_noise, SNRs[i])
-
-#     # calculate ccf
-#     v_grid, ccf1 = calc_ccf(wavs_iso, flux_noise, lines[idx], depths[idx], 7e5)
-#     rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1)
-#     rv_std[i] = std(rvs1)
-# end
-
-# plt.plot(SNRs, rv_std)
-# plt.show()
-=#

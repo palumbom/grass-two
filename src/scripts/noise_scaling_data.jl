@@ -15,9 +15,15 @@ using Distributions
 # make sure there is a GPU
 @assert CUDA.functional()
 
+# get the name of template from the command line args
+template_idx = ARGS[1]
+lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
+line_files = GRASS.get_file(lp)
+template = line_files[template_idx]
+
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
-const datafile = string(abspath(joinpath(data, "picket_fence.jld2")))
+datafile = string(abspath(joinpath(data, template * "_picket_fence.jld2")))
 
 # get input data properties
 lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
@@ -29,7 +35,7 @@ line_titles = replace.(line_names, "_" => " ")
 line_files = GRASS.get_file(lp)
 
 # get index of line template I want
-idx = findfirst(x -> contains(x, "FeI_5434"), line_names)
+idx = findfirst(x -> contains(x, template), line_names)
 
 # parameters for spectrum
 nlines = 250
