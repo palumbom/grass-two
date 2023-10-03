@@ -16,10 +16,11 @@ using Distributions
 @assert CUDA.functional()
 
 # get the name of template from the command line args
-template_idx = ARGS[1]
+template_idx = tryparse(Int, ARGS[1])
 lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
-line_files = GRASS.get_file(lp)
-template = line_files[template_idx]
+line_names = GRASS.get_name(lp)
+template = line_names[template_idx]
+println(">>> Template = " * template)
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
