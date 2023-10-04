@@ -34,12 +34,10 @@ end
 
 # get the name of template from the command line args
 @everywhere begin
-    # template_idx = tryparse(Int, ARGS[1])
-    # lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
-    # line_names = GRASS.get_name(lp)
-    # template = line_names[template_idx]
-
-    template = "FeI_5434"
+    template_idx = tryparse(Int, ARGS[1])
+    lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
+    line_names = GRASS.get_name(lp)
+    template = line_names[template_idx]
 end
 
 # get command line args and output directories
@@ -105,27 +103,26 @@ end
                     flux_degd = copy(flux_temp)
                 else
                     # do an initial conv to get output size
-                    wavs_to_deg = view(wavs_temp, :, 1)
-                    flux_to_deg = view(flux_temp, :, 1)
+                    wavs_to_deg = wavs_temp[:, 1]
+                    flux_to_deg = flux_temp[:, 1]
                     wavs_size, flux_size = GRASS.convolve_gauss(wavs_to_deg,
                                                                 flux_to_deg,
                                                                 new_res=resolutions[j],
                                                                 oversampling=oversampling)
 
                     # allocate memory
-                    wavs_degd = zeros(size(wavs_size, 1), size(flux_temp, 2))
+                    wavs_degd = wavs_size
                     flux_degd = zeros(size(wavs_size, 1), size(flux_temp, 2))
 
                     # loop over epochs and convolve
                     for k in 1:size(flux_temp, 2)
-                        flux_to_deg = view(flux_temp, :, j)
+                        flux_to_deg = view(flux_temp, :, k)
                         wavs_out, flux_out = GRASS.convolve_gauss(wavs_to_deg,
                                                                   flux_to_deg,
-                                                                  new_res=resolutions[i],
+                                                                  new_res=resolutions[j],
                                                                   oversampling=oversampling)
 
                         # copy to array
-                        wavs_degd[:, k] .= wavs_out
                         flux_degd[:, k] .= flux_out
                     end
                 end
