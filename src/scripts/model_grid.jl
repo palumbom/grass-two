@@ -17,27 +17,13 @@ mpl.style.use(GRASS.moddir * "fig.mplstyle")
 include(joinpath(abspath(@__DIR__), "paths.jl"))
 const plotfile = string(abspath(joinpath(figures, "model_grid.pdf")))
 
-# set up paramaters for spectrum
-N = 50
-Nt = 1
-lines = [5500.0]
-depths = [0.75]
-templates = ["FeI_5434"]
-variability = falses(length(lines))
-blueshifts = zeros(length(lines))
-resolution = 7e5
-seed_rng = true
-
-disk = DiskParams(N=N, Nt=Nt, inclination=60.0, Nsubgrid=40)
-spec = SpecParams(lines=lines, depths=depths, variability=variability,
-                  blueshifts=blueshifts, templates=templates,
-                  resolution=resolution)
-
-# precompute CPU quantities
-soldata_cpu = GRASS.SolarData()
-
 # make sure we have a GPU
 @assert CUDA.functional()
+
+# set up paramaters for spectrum
+N = 200
+Nt = 1
+disk = DiskParams(N=N, Nt=Nt, inclination=90.0, Nsubgrid=40)
 
 # get size of sub-tiled grid
 Nϕ = disk.N
@@ -72,24 +58,18 @@ CUDA.@sync begin
 end
 
 # compute geometric parameters, average over subtiles
+println("\t>>> Computing geometry...")
 threads1 = 256
 blocks1 = cld(Nϕ * Nθ_max, prod(threads1))
 CUDA.@sync @captured @cuda threads=threads1 blocks=blocks1 GRASS.precompute_quantities_gpu!(μs, wts, z_rot, ax_code, Nϕ,
                                                                                             Nθ_max, Nsubgrid, Nθ, R_x, O⃗,
                                                                                             ρs, A, B, C, v0, u1, u2)
 
-# allocations on GPU
-if CUDA.functional()
-    soldata_gpu = GRASS.GPUSolarData(soldata_cpu)
-    gpu_allocs = GRASS.GPUAllocs(spec, disk)
-
-    # precompute GPU quantities
-    GRASS.get_keys_and_cbs_gpu!(gpu_allocs, soldata_gpu)
-    μs_gpu = Array(μs)
-    wts_gpu = Array(wts)
-    z_rot_gpu = Array(z_rot)
-    ax_codes_gpu = Array(ax_code)
-end
+# copy arrays from gpu
+μs_gpu = Array(μs)
+wts_gpu = Array(wts)
+z_rot_gpu = Array(z_rot)
+ax_codes_gpu = Array(ax_code)
 
 # disk coordinates
 ϕe = disk.ϕe
@@ -102,7 +82,7 @@ R_z = disk.R_z
 
 # get color scalar mappable
 dat = wts_gpu ./ maximum(wts_gpu)
-cmap = plt.cm.inferno
+cmap = plt.cm.afmhot
 
 # dat = z_rot_gpu .* 3e8
 # cmap = plt.cm.seismic
@@ -142,73 +122,73 @@ for i in 1:length(ϕe)-1
 
         idx = z .>= 0
         if any(idx)
-            ax.plot(x[idx], y[idx], color="k", lw=1)
+            # ax.plot(x[idx], y[idx], color="k", lw=1)
             ax.fill(x[idx], y[idx], c=smap.to_rgba(dat[i,j]))
         end
     end
 end
 
-# get equator coords
-latitude = deg2rad(0.0)
-longitude = deg2rad.(range(0.0, 360.0, length=200))
-x_eq = []
-y_eq = []
-z_eq = []
-for i in eachindex(longitude)
-    out = GRASS.sphere_to_cart.(1.0, latitude, longitude[i])
-    x = getindex(out, 1)
-    y = getindex(out, 2)
-    z = getindex(out, 3)
+# # get equator coords
+# latitude = deg2rad(0.0)
+# longitude = deg2rad.(range(0.0, 360.0, length=200))
+# x_eq = []
+# y_eq = []
+# z_eq = []
+# for i in eachindex(longitude)
+#     out = GRASS.sphere_to_cart.(1.0, latitude, longitude[i])
+#     x = getindex(out, 1)
+#     y = getindex(out, 2)
+#     z = getindex(out, 3)
 
-    x0 = x
-    y0 = y
-    z0 = z
+#     x0 = x
+#     y0 = y
+#     z0 = z
 
-    x = x0 * R_x[1,1] + y0 * R_x[1,2] + z0 * R_x[1,3]
-    y = x0 * R_x[2,1] + y0 * R_x[2,2] + z0 * R_x[2,3]
-    z = x0 * R_x[3,1] + y0 * R_x[3,2] + z0 * R_x[3,3]
+#     x = x0 * R_x[1,1] + y0 * R_x[1,2] + z0 * R_x[1,3]
+#     y = x0 * R_x[2,1] + y0 * R_x[2,2] + z0 * R_x[2,3]
+#     z = x0 * R_x[3,1] + y0 * R_x[3,2] + z0 * R_x[3,3]
 
-    push!(x_eq, x)
-    push!(y_eq, y)
-    push!(z_eq, z)
-end
+#     push!(x_eq, x)
+#     push!(y_eq, y)
+#     push!(z_eq, z)
+# end
 
-# sort the values on increasing x
-idx_eq = sortperm(x_eq)
-x_eq = x_eq[idx_eq]
-y_eq = y_eq[idx_eq]
-z_eq = z_eq[idx_eq]
+# # sort the values on increasing x
+# idx_eq = sortperm(x_eq)
+# x_eq = x_eq[idx_eq]
+# y_eq = y_eq[idx_eq]
+# z_eq = z_eq[idx_eq]
 
-idx_eq = z_eq .> 0.0
+# idx_eq = z_eq .> 0.0
 
-# plot the equator
-ax.plot(x_eq[idx_eq], y_eq[idx_eq], color="white", ls="--", zorder=3, alpha=0.75)
+# # plot the equator
+# ax.plot(x_eq[idx_eq], y_eq[idx_eq], color="white", ls="--", zorder=3, alpha=0.75)
 
-# get meridians
-latitude = deg2rad.(range(-89.0, 89.0, length=200))
-longitude = deg2rad.(range(0.0, 360.0, step=90.0))
+# # get meridians
+# latitude = deg2rad.(range(-89.0, 89.0, length=200))
+# longitude = deg2rad.(range(0.0, 360.0, step=90.0))
 
-for j in eachindex(longitude)
-    out = GRASS.sphere_to_cart.(1.0, latitude, longitude[j])
+# for j in eachindex(longitude)
+#     out = GRASS.sphere_to_cart.(1.0, latitude, longitude[j])
 
-    out = hcat(out...)
+#     out = hcat(out...)
 
-    x = out[1,:]
-    y = out[2,:]
-    z = out[3,:]
+#     x = out[1,:]
+#     y = out[2,:]
+#     z = out[3,:]
 
-    x0 = x
-    y0 = y
-    z0 = z
+#     x0 = x
+#     y0 = y
+#     z0 = z
 
-    x = x0 .* R_x[1,1] .+ y0 .* R_x[1,2] .+ z0 .* R_x[1,3]
-    y = x0 .* R_x[2,1] .+ y0 .* R_x[2,2] .+ z0 .* R_x[2,3]
-    z = x0 .* R_x[3,1] .+ y0 .* R_x[3,2] .+ z0 .* R_x[3,3]
+#     x = x0 .* R_x[1,1] .+ y0 .* R_x[1,2] .+ z0 .* R_x[1,3]
+#     y = x0 .* R_x[2,1] .+ y0 .* R_x[2,2] .+ z0 .* R_x[2,3]
+#     z = x0 .* R_x[3,1] .+ y0 .* R_x[3,2] .+ z0 .* R_x[3,3]
 
-    # plot the meridian
-    idx = z .> 0.0
-    ax.plot(x[idx], y[idx], color="white", ls="--", zorder=3, alpha=0.75)
-end
+#     # plot the meridian
+#     idx = z .> 0.0
+#     ax.plot(x[idx], y[idx], color="white", ls="--", zorder=3, alpha=0.75)
+# end
 
 ax.set_xlabel(L"\Delta {\rm x\ [Stellar\ Radii]}")
 ax.set_ylabel(L"\Delta {\rm y\ [Stellar\ Radii]}")
