@@ -38,22 +38,6 @@ if !isdir(plotsubdir)
     mkdir(plotsubdir)
 end
 
-# # function to get lines
-# function get_lines(wavs, flux, last_line_number)
-#     if last_line_number == length(lines)
-#         return view(wavs, :), view(flux, :, :)
-#     else
-#         idx = findfirst(x -> x .>= lines[last_line_number] + 0.5 * line_sep, wavs)
-#         return view(wavs, 1:idx), view(flux, 1:idx, :)
-#     end
-# end
-
-# function get_one_line(wavs, flux, line_number; t=1)
-#     idx1 = findfirst(x -> x .>= lines[line_number] - 0.5 * line_sep, wavs)
-#     idx2 = findfirst(x -> x .>= lines[line_number] + 0.5 * line_sep, wavs)
-#     return view(wavs, idx1:idx2), view(flux, idx1:idx2, t)
-# end
-
 function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
                                 resolutions::AA{T,1},
                                 nlines_to_do::AA{Int,1},
@@ -79,6 +63,9 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
             ls = wavs_degd[pks] # view(lines, 1:nlines_to_do[i])
             ds = 1.0 .- flux_degd[pks,1] # view(depths, 1:nlines_to_do[i])
 
+            # ls = view(lines, 1:nlines_to_do[i])
+            # ds = view(depths, 1:nlines_to_do[i])
+
             # get view of spectrum
             lidx = 1
             if nlines_to_do[j] >= length(pks)
@@ -91,7 +78,7 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
             flux_view = view(flux_degd, lidx:ridx, :)
 
             # calculate ccf
-            v_grid, ccf1 = calc_ccf(wavs_view, flux_view, ls, ds, resolutions[i], Δv_step=50.0)
+            v_grid, ccf1 = calc_ccf(wavs_view, flux_view, ls, ds, resolutions[i], Δv_step=10.0, Δv_max=32e3)
             rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1)
             rvs_std[i,j] = std(rvs1)
 
@@ -104,10 +91,10 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
 
             # calc bisector summary statistics
             bis_inv_slope = GRASS.calc_bisector_inverse_slope(vel, int)
-            bis_span = GRASS.calc_bisector_span(vel, int)
-            bis_slope = GRASS.calc_bisector_slope(vel, int)
-            bis_curve = GRASS.calc_bisector_curvature(vel, int)
-            bis_bot = GRASS.calc_bisector_bottom(vel, int, rvs1)
+            # bis_span = GRASS.calc_bisector_span(vel, int)
+            # bis_slope = GRASS.calc_bisector_slope(vel, int)
+            # bis_curve = GRASS.calc_bisector_curvature(vel, int)
+            # bis_bot = GRASS.calc_bisector_bottom(vel, int, rvs1)
 
             # data to fit
             xdata = bis_inv_slope
@@ -150,15 +137,15 @@ end
 # read in the data
 d = load(datafile)
 wavs = d["wavs"]
-flux = d["flux"]
+flux = d["flux"][:, 1:500]
 lines = d["lines"]
 depths = d["depths"]
 templates = d["templates"]
 
 # snrs to loop over
-nlines_to_do = [25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300]
-snrs_for_lines = [100.0, 150.0, 200.0, 250.0, 300.0, 400.0, 500.0, 750.0, 1000.0]
-resolutions = [0.98e5, 1.2e5, 1.37e5, 2.7e5, 5.0e5] #, 7e5]
+nlines_to_do = [50, 100, 125, 150, 175, 200, 225, 250, 275, 300]
+snrs_for_lines = [100.0, 200.0, 300.0, 400.0, 500.0, 750.0, 1000.0]
+resolutions = [0.98e5, 1.2e5, 1.37e5, 2.7e5, 5.0e5]
 
 # allocate memory for output
 rvs_std_out = zeros(length(resolutions), length(nlines_to_do), length(snrs_for_lines))

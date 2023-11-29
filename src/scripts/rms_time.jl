@@ -17,6 +17,13 @@ import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
 mpl.style.use(GRASS.moddir * "fig.mplstyle")
 colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
+# get the name of template from the command line args
+template = "FeI_5434"
+
+# get command line args and output directories
+include("paths.jl")
+datafile = string(abspath(joinpath(data, template * "_picket_fence.jld2")))
+
 # set output directory
 outdir = "/storage/work/mlp95/grass_output/plots/rms_stuff/"
 
@@ -24,40 +31,50 @@ outdir = "/storage/work/mlp95/grass_output/plots/rms_stuff/"
 lp = GRASS.LineProperties()
 names = GRASS.get_name(lp)
 
+# read in the data
+d = load(datafile)
+wavs = d["wavs"]
+flux = d["flux"]
+lines = d["lines"]
+depths = d["depths"]
+templates = d["templates"]
+
 # # set up stuff for lines
 # Nt = 32000
 # lines = collect(range(5400.0, 5500.0, length=length(lp.λrest)))
 # templates = lp.file
 # depths = lp.depth
 
-for i in eachindex(lp.λrest)
-    println("\t>>> Doing " * names[i])
+# for i in eachindex(lp.λrest)
+    # println("\t>>> Doing " * names[i])
 
-    # set up stuff for synthesis
-    Nt = 32000
-    lines = [5576.0881]
-    templates = [lp.file[i]]
-    depths = [lp.depth[i]]
-    variability = trues(length(templates))
-    resolution = 7e5
-    disk = DiskParams(Nt=Nt)
-    spec = SpecParams(lines=lines, depths=depths, variability=variability,
-                      templates=templates, resolution=resolution)
+    # # set up stuff for synthesis
+    # Nt = 32000
+    # lines = [5576.0881]
+    # templates = [lp.file[i]]
+    # depths = [lp.depth[i]]
+    # variability = trues(length(templates))
+    # resolution = 7e5
+    # disk = DiskParams(Nt=Nt)
+    # spec = SpecParams(lines=lines, depths=depths, variability=variability,
+    #                   templates=templates, resolution=resolution)
 
-    # synthesize spectra
-    lambdas1, outspec1 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true)
+    # # synthesize spectra
+    # lambdas1, outspec1 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true)
 
+    lambdas1 = wavs
+    outspec1 = flux
     outspec2 = copy(outspec1)
     GRASS.add_noise!(outspec2, 500.0)
 
     # compute velocities
     println("\t>>> Calculating CCFs...")
-    v_grid, ccf = calc_ccf(lambdas1, outspec1, spec)
+    v_grid, ccf = calc_ccf(lambdas1, outspec1, lines, depths, 7e5)
     println("\t>>> Calculating RVs...")
     rvs, sigs = calc_rvs_from_ccf(v_grid, ccf)
 
     println("\t>>> Calculating CCFs...again...")
-    v_grid2, ccf2 = calc_ccf(lambdas1, outspec2, spec)
+    v_grid2, ccf2 = calc_ccf(lambdas1, outspec2, lines, depths, 7e5)
     println("\t>>> Calculating RVs...again...")
     rvs2, sigs2 = calc_rvs_from_ccf(v_grid2, ccf2)
 
@@ -103,9 +120,9 @@ for i in eachindex(lp.λrest)
     end
 
     # get title
-    title = replace(names[i], "_" => "\\ ")
-    idx = findfirst('I', title)
-    title = title[1:idx-1] * "\\ " * title[idx:end] * "\\ \\AA"
+    # title = replace(names[i], "_" => "\\ ")
+    # idx = findfirst('I', title)
+    # title = title[1:idx-1] * "\\ " * title[idx:end] * "\\ \\AA"
 
     # plot it
     fig, ax1 = plt.subplots()
@@ -116,13 +133,13 @@ for i in eachindex(lp.λrest)
     ax1.set_xscale("log")
     ax1.set_yscale("log")
     ax1.legend()
-    ax1.set_title(("\${\\rm " * title * "}\$"))
+    # ax1.set_title(("\${\\rm " * title * "}\$"))
     ax1.set_xlabel("Frequency [Hz]")
     ax1.set_ylabel(L"{\rm Power\ [(m\ s}^{-1}{\rm )}^2 {\rm \ Hz}^{-1}{\rm ]}")
     # ax1.set_xlim(1e-8, maximum(freqs))
     # ax1.set_ylim(1, 1e5)
-    fig.savefig(joinpath(outdir, names[i] * "power_spec.pdf"))
-    # plt.show()
+    # fig.savefig(joinpath(outdir, names[i] * "power_spec.pdf"))
+    plt.show()
     plt.clf(); plt.close()
 
 
@@ -166,7 +183,85 @@ for i in eachindex(lp.λrest)
     fig.savefig(joinpath(outdir, names[i] * "rms_smoothing.pdf"))
     # plt.show()
     plt.clf(); plt.close()
-end
+# end
+
+# get ccf bisector
+vel1, int1 = GRASS.calc_bisector(v_grid, ccf, nflux=100, top=0.99)
+
+# smooth the bisector
+vel1 = GRASS.moving_average(vel1, 4)
+int1 = GRASS.moving_average(int1, 4)
+
+# calc bisector summary statistics
+bis_inv_slope1 = GRASS.calc_bisector_inverse_slope(vel1, int1)
+
+# fit to it
+xdata1 = bis_inv_slope1 .- mean(bis_inv_slope1)
+ydata1 = rvs .- mean(rvs)
+
+pfit1 = Polynomials.fit(xdata1, ydata1, 1)
+xmodel1 = range(minimum(xdata1), maximum(xdata1), length=5)
+ymodel1 = pfit1.(xmodel1)
+resids1 = pfit1.(xdata1) .- ydata1
+
+plt.scatter(bis_inv_slope1 .- mean(bis_inv_slope1), rvs .- mean(rvs), s=5, alpha=0.8)
+plt.plot(xmodel1, ymodel1, c="k")
+plt.show()
+
+# decorrelate the velocities
+rvs_to_subtract1 = pfit1.(xdata1)
+rvs_new1 = rvs .- rvs_to_subtract1
+
+
+    # get power spectrum of velocities
+    sampling_rate = 1.0/15.0
+    F = fftshift(fft(rvs_new1))
+    freqs = fftshift(fftfreq(length(rvs_new1), sampling_rate))
+
+    # throw away samplings of frequencies less than 0.0s
+    idx = findall(freqs .> 0.0)
+    F = F[idx]
+    freqs = freqs[idx]
+
+    # throw away samplings of frequencies less than 0.0s
+    idx = findall(freqs .> 0.0)
+    F = F[idx]
+    freqs = freqs[idx]
+
+    # bin the frequencies
+    minfreq = log10(minimum(freqs))
+    maxfreq = log10(maximum(freqs))
+    freqstep = 1e-1
+    freqs_binned = collect(10.0 .^ (range(minfreq, maxfreq, step=freqstep)))
+    freqs_bincen = (freqs_binned[2:end] .+ freqs_binned[1:end-1])./2
+    F_binned = zeros(length(freqs_binned)-1)
+    for i in eachindex(F_binned)
+        j = findall(x -> (x .>= freqs_binned[i]) .& (x .<= freqs_binned[i+1]), freqs)
+        F_binned[i] = mean(abs2.(F[j]))
+    end
+
+    # get title
+    # title = replace(names[i], "_" => "\\ ")
+    # idx = findfirst('I', title)
+    # title = title[1:idx-1] * "\\ " * title[idx:end] * "\\ \\AA"
+
+    # plot it
+    fig, ax1 = plt.subplots()
+    ax1.scatter(freqs, abs2.(F), s=1, c="k")
+    ax1.scatter(freqs_bincen, F_binned, marker="x", c="red")
+    ax1.axvline(1.0 / (60.0 * 20.0), ls=":", c="k", alpha=0.75, label=L"{\rm 20\ min.}")
+    ax1.axvline(1.0 / (15.0), ls="--", c="k", alpha=0.75, label=L"{\rm 15\ sec.}")
+    ax1.set_xscale("log")
+    ax1.set_yscale("log")
+    ax1.legend()
+    # ax1.set_title(("\${\\rm " * title * "}\$"))
+    ax1.set_xlabel("Frequency [Hz]")
+    ax1.set_ylabel(L"{\rm Power\ [(m\ s}^{-1}{\rm )}^2 {\rm \ Hz}^{-1}{\rm ]}")
+    # ax1.set_xlim(1e-8, maximum(freqs))
+    # ax1.set_ylim(1, 1e5)
+    # fig.savefig(joinpath(outdir, names[i] * "power_spec.pdf"))
+    plt.show()
+    plt.clf(); plt.close()
 
 
 #=# loop over times
