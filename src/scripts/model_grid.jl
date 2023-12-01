@@ -13,6 +13,7 @@ using BenchmarkTools
 using LaTeXStrings
 import PyPlot; plt = PyPlot; mpl = plt.matplotlib; plt.ioff()
 mpl.style.use(GRASS.moddir * "fig.mplstyle")
+ConnectionPatch = mpl.patches.ConnectionPatch
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
@@ -93,6 +94,10 @@ smap = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 
 # initialize figure
 fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(16,8))
+
+# plot circle background to smooth jagged edges
+circle1 = mpl.patches.Circle((0, 0), 1.01, color="k", zorder=0)
+ax1.add_patch(circle1)
 
 # coords for zoom in cell
 ϕidx = 10
@@ -245,7 +250,7 @@ for k in eachindex(x)
     y[k] = x0 * R_x[2,1] + y0 * R_x[2,2] + z0 * R_x[2,3]
     z[k] = x0 * R_x[3,1] + y0 * R_x[3,2] + z0 * R_x[3,3]
 end
-ax2.plot(x, y, color="tab:blue", lw=4.5)
+ax2.plot(x, y, color="tab:blue", lw=6)
 
 
 # set limits
@@ -362,6 +367,26 @@ square_y_coords = [square_y[1], square_y[2], square_y[2], square_y[1], square_y[
 ax1.plot(square_x_coords, square_y_coords, c="white", lw=1.5)
 ax1.plot(square_x_coords, square_y_coords, c="k", lw=1)
 
+# draw lines connecting zoom-in
+xy1_lr = (square_x[1], square_y[1])
+xy1_ur = (square_x[1], square_y[2])
+
+xy2_ll = (square_x[2], square_y[1])
+xy2_ul = (square_x[2], square_y[2])
+
+l1 = ConnectionPatch(xyA=xy1_lr, xyB=xy2_ll, coordsA=ax1.transData, coordsB=ax2.transData, color="white", lw=1.5)
+l2 = ConnectionPatch(xyA=xy1_ur, xyB=xy2_ul, coordsA=ax1.transData, coordsB=ax2.transData, color="white", lw=1.5)
+
+fig.add_artist(l1)
+fig.add_artist(l2)
+
+l3 = ConnectionPatch(xyA=xy1_lr, xyB=xy2_ll, coordsA=ax1.transData, coordsB=ax2.transData, color="k", lw=1)
+l4 = ConnectionPatch(xyA=xy1_ur, xyB=xy2_ul, coordsA=ax1.transData, coordsB=ax2.transData, color="k", lw=1)
+
+fig.add_artist(l3)
+fig.add_artist(l4)
+
+
 ax1.set_xlabel(L"\Delta x\ {\rm [Stellar\ Radii]}")
 ax1.set_ylabel(L"\Delta y\ {\rm [Stellar\ Radii]}")
 ax2.set_xlabel(L"\Delta x\ {\rm [Stellar\ Radii]}")
@@ -375,7 +400,7 @@ ax2.grid(false)
 ax1.invert_xaxis()
 ax2.invert_xaxis()
 
-fig.tight_layout()
+# fig.tight_layout()
 
 cax = fig.add_axes([ax2.get_position().x1+0.075,ax1.get_position().y0,0.02,ax1.get_position().height])
 cb = fig.colorbar(smap, cax=cax)

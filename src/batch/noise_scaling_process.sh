@@ -6,10 +6,10 @@
 #SBATCH --ntasks-per-node=8
 #SBATCH --ntasks=8
 #SBATCH --mem-per-cpu=64GB
-#SBATCH --time=48:00:00
+#SBATCH --time=72:00:00
 #SBATCH --job-name=noiseplot
 #SBATCH --chdir=/storage/home/mlp95/work/grass-two
-#SBATCH --output=/storage/home/mlp95/work/logs/noiseplot_%A-%a.out
+#SBATCH --output=/storage/home/mlp95/work/logs/noiseproc_%A-%a.out
 
 echo "About to start: $SLURM_JOB_NAME"
 date

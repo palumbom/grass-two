@@ -143,8 +143,8 @@ depths = d["depths"]
 templates = d["templates"]
 
 # snrs to loop over
-nlines_to_do = [50, 100, 125, 150, 175, 200, 225, 250, 275, 300]
-snrs_for_lines = [100.0, 200.0, 300.0, 400.0, 500.0, 750.0, 1000.0]
+nlines_to_do = [50, 100, 150, 200, 250, 300, 400]
+snrs_for_lines = [200.0, 300.0, 400.0, 500.0, 750.0, 1000.0]
 resolutions = [0.98e5, 1.2e5, 1.37e5, 2.7e5, 5.0e5]
 
 # allocate memory for output
