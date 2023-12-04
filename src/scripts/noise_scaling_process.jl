@@ -55,6 +55,35 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
         pks, vals = findminima(flux_degd[:,1])
         pks, proms = peakproms!(pks, flux_degd[:,1]; minprom=0.1)
 
+        # get view of first line
+        wavs_window = view(wavs_degd, 1:pks[1]+round(Int, (pks[2] - pks[1])/2))
+        flux_window = view(flux_degd, 1:pks[1]+round(Int, (pks[2] - pks[1])/2), 1)
+
+        # get width of line at ~95% flux
+        idxl, idxr = GRASS.find_wing_index(0.9, flux_window)
+
+        # get width in angstroms
+        width_ang = wavs_window[idxr] - wavs_window[idxl]
+
+        # convert to velocity
+        width_vel = GRASS.c_ms * width_ang / wavs_degd[pks[1]]
+
+        # get the velocity step and velocity window for CCF
+        Δv_step = 100.0
+        Δv_max = round((width_vel + 1e3)/100) * 100
+
+        v_grid = range(-Δv_max, Δv_max, step=Δv_step)
+
+        # allocate memory that will be reused in line loop
+        len_v = 1 + round(Int, (Δv_max * 2) / Δv_step)
+        ccf1 = zeros(len_v, size(flux_degd,2))
+        projection_full = zeros(length(wavs), 1)
+        proj_flux_full = zeros(length(wavs))
+        ccf1 = zeros(len_v, size(flux_degd,2))
+        bis_inv_slope = zeros(size(flux_degd,2))
+        xdata = zeros(size(flux_degd,2))
+        ydata = zeros(size(flux_degd,2))
+
         # get spectrum at specified snr
         GRASS.add_noise!(flux_degd, snr)
 
@@ -77,10 +106,20 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
             wavs_view = view(wavs_degd, lidx:ridx)
             flux_view = view(flux_degd, lidx:ridx, :)
 
+            # get views of memory
+            projection = view(projection_full, 1:length(wavs_view), :)
+            proj_flux = view(proj_flux_full, 1:length(wavs_view))
+
             # calculate ccf
-            v_grid, ccf1 = calc_ccf(wavs_view, flux_view, ls, ds, resolutions[i], Δv_step=10.0, Δv_max=32e3)
+            GRASS.calc_ccf!(v_grid, projection, proj_flux, ccf1,
+                            wavs_view, flux_view, ls, ds,
+                            resolutions[i], Δv_step=Δv_step,
+                            Δv_max=Δv_max)
             rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1)
             rvs_std[i,j] = std(rvs1)
+
+            plt.plot(v_grid, ccf1[:,1])
+            plt.show()
 
             # get ccf bisector
             vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
@@ -90,15 +129,15 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
             int = GRASS.moving_average(int, 4)
 
             # calc bisector summary statistics
-            bis_inv_slope = GRASS.calc_bisector_inverse_slope(vel, int)
+            bis_inv_slope .= GRASS.calc_bisector_inverse_slope(vel, int)
             # bis_span = GRASS.calc_bisector_span(vel, int)
             # bis_slope = GRASS.calc_bisector_slope(vel, int)
             # bis_curve = GRASS.calc_bisector_curvature(vel, int)
             # bis_bot = GRASS.calc_bisector_bottom(vel, int, rvs1)
 
             # data to fit
-            xdata = bis_inv_slope
-            ydata = rvs1
+            xdata .= bis_inv_slope
+            ydata .= rvs1
 
             # perform the fit
             pfit = Polynomials.fit(xdata, ydata, 1)
@@ -163,10 +202,10 @@ rvs_std_decorr_out = zeros(length(resolutions), length(nlines_to_do), length(snr
     std_vs_number_of_lines(wavs, flux, resolutions, nlines_to_do, v1, v2, snrs_for_lines[i])
 end
 
-# write the data
-jldsave(string(joinpath(data, template * "_rvs_std_out.jld2")),
-        nlines_to_do=nlines_to_do,
-        snrs_for_lines=snrs_for_lines,
-        resolutions=resolutions,
-        rvs_std_out=rvs_std_out,
-        rvs_std_decorr_out=rvs_std_decorr_out)
+# # write the data
+# jldsave(string(joinpath(data, template * "_rvs_std_out.jld2")),
+#         nlines_to_do=nlines_to_do,
+#         snrs_for_lines=snrs_for_lines,
+#         resolutions=resolutions,
+#         rvs_std_out=rvs_std_out,
+#         rvs_std_decorr_out=rvs_std_decorr_out)
