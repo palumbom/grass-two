@@ -59,8 +59,8 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
         wavs_window = view(wavs_degd, 1:pks[1]+round(Int, (pks[2] - pks[1])/2))
         flux_window = view(flux_degd, 1:pks[1]+round(Int, (pks[2] - pks[1])/2), 1)
 
-        # get width of line at ~95% flux
-        idxl, idxr = GRASS.find_wing_index(0.9, flux_window)
+        # get width of line at ~92.5% flux
+        idxl, idxr = GRASS.find_wing_index(0.925, flux_window)
 
         # get width in angstroms
         width_ang = wavs_window[idxr] - wavs_window[idxl]
@@ -69,7 +69,7 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
         width_vel = GRASS.c_ms * width_ang / wavs_degd[pks[1]]
 
         # get the velocity step and velocity window for CCF
-        Δv_step = 100.0
+        Δv_step = 50.0
         Δv_max = round((width_vel + 1e3)/100) * 100
 
         v_grid = range(-Δv_max, Δv_max, step=Δv_step)
@@ -77,8 +77,8 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
         # allocate memory that will be reused in line loop
         len_v = 1 + round(Int, (Δv_max * 2) / Δv_step)
         ccf1 = zeros(len_v, size(flux_degd,2))
-        projection_full = zeros(length(wavs), 1)
-        proj_flux_full = zeros(length(wavs))
+        projection_full = zeros(length(wavs_degd), 1)
+        proj_flux_full = zeros(length(wavs_degd))
         ccf1 = zeros(len_v, size(flux_degd,2))
         bis_inv_slope = zeros(size(flux_degd,2))
         xdata = zeros(size(flux_degd,2))
@@ -88,9 +88,12 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
         GRASS.add_noise!(flux_degd, snr)
 
         for j in eachindex(nlines_to_do)
+            # get number of lines
+            n_lines_j = nlines_to_do[j]
+
             # get lines to include in ccf
-            ls = wavs_degd[pks] # view(lines, 1:nlines_to_do[i])
-            ds = 1.0 .- flux_degd[pks,1] # view(depths, 1:nlines_to_do[i])
+            ls = wavs_degd[pks[1:n_lines_j]]
+            ds = 1.0 .- flux_degd[pks[1:n_lines_j],1]
 
             # ls = view(lines, 1:nlines_to_do[i])
             # ds = view(depths, 1:nlines_to_do[i])
@@ -117,9 +120,6 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
                             Δv_max=Δv_max)
             rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1)
             rvs_std[i,j] = std(rvs1)
-
-            plt.plot(v_grid, ccf1[:,1])
-            plt.show()
 
             # get ccf bisector
             vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
@@ -182,7 +182,7 @@ depths = d["depths"]
 templates = d["templates"]
 
 # snrs to loop over
-nlines_to_do = [50, 100, 150, 200, 250, 300, 400]
+nlines_to_do = [50, 100, 150, 200, 250, 300, 400, 500]
 snrs_for_lines = [200.0, 300.0, 400.0, 500.0, 750.0, 1000.0]
 resolutions = [0.98e5, 1.2e5, 1.37e5, 2.7e5, 5.0e5]
 
@@ -202,10 +202,10 @@ rvs_std_decorr_out = zeros(length(resolutions), length(nlines_to_do), length(snr
     std_vs_number_of_lines(wavs, flux, resolutions, nlines_to_do, v1, v2, snrs_for_lines[i])
 end
 
-# # write the data
-# jldsave(string(joinpath(data, template * "_rvs_std_out.jld2")),
-#         nlines_to_do=nlines_to_do,
-#         snrs_for_lines=snrs_for_lines,
-#         resolutions=resolutions,
-#         rvs_std_out=rvs_std_out,
-#         rvs_std_decorr_out=rvs_std_decorr_out)
+# write the data
+jldsave(string(joinpath(data, template * "_rvs_std_out.jld2")),
+        nlines_to_do=nlines_to_do,
+        snrs_for_lines=snrs_for_lines,
+        resolutions=resolutions,
+        rvs_std_out=rvs_std_out,
+        rvs_std_decorr_out=rvs_std_decorr_out)

@@ -331,7 +331,17 @@ for i in eachindex(lat)
             y[k] = x0 * R_x[2,1] + y0 * R_x[2,2] + z0 * R_x[2,3]
             z[k] = x0 * R_x[3,1] + y0 * R_x[3,2] + z0 * R_x[3,3]
         end
-        ax2.plot(x, y, color="k", lw=1.5, ls=":")
+        ax2.plot(x[1:5], y[1:5], color="k", lw=1.5, ls="--")
+        ax2.plot(x[5:9], y[5:9], color="k", lw=1.5, ls="--")
+
+        if j == length(lon) - 1
+            ax2.plot(x[9:13], y[9:13], color="k", lw=1.5, ls="--")
+        end
+
+        if i == 1
+            ax2.plot(x[13:end], y[13:end], color="k", lw=1.5, ls="--")
+        end
+
 
         # now do a scatter for grid centers
         lat3 = (first(lat2) + last(lat2)) / 2.0
@@ -387,10 +397,10 @@ fig.add_artist(l3)
 fig.add_artist(l4)
 
 
-ax1.set_xlabel(L"\Delta x\ {\rm [Stellar\ Radii]}")
-ax1.set_ylabel(L"\Delta y\ {\rm [Stellar\ Radii]}")
-ax2.set_xlabel(L"\Delta x\ {\rm [Stellar\ Radii]}")
-ax2.set_ylabel(L"\Delta y\ {\rm [Stellar\ Radii]}")
+ax1.set_xlabel(L"\Delta x\ {\rm [Apparent\ Stellar\ Radii]}")
+ax1.set_ylabel(L"\Delta y\ {\rm [Apparent\ Stellar\ Radii]}")
+ax2.set_xlabel(L"\Delta x\ {\rm [Apparent\ Stellar\ Radii]}")
+ax2.set_ylabel(L"\Delta y\ {\rm [Apparent\ Stellar\ Radii]}")
 ax2.yaxis.tick_right()
 ax2.yaxis.set_label_position("right")
 ax1.set_aspect("equal")
@@ -400,7 +410,7 @@ ax2.grid(false)
 ax1.invert_xaxis()
 ax2.invert_xaxis()
 
-# fig.tight_layout()
+fig.tight_layout()
 
 cax = fig.add_axes([ax2.get_position().x1+0.075,ax1.get_position().y0,0.02,ax1.get_position().height])
 cb = fig.colorbar(smap, cax=cax)

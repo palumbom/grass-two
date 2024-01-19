@@ -5,6 +5,7 @@ using GRASS
 using FileIO
 using Printf
 using Revise
+using LsqFit
 using Statistics
 using EchelleCCFs
 using Polynomials
@@ -31,71 +32,32 @@ outdir = "/storage/work/mlp95/grass_output/plots/rms_stuff/"
 lp = GRASS.LineProperties()
 names = GRASS.get_name(lp)
 
-# read in the data
-d = load(datafile)
-wavs = d["wavs"]
-flux = d["flux"]
-lines = d["lines"]
-depths = d["depths"]
-templates = d["templates"]
-
-# # set up stuff for lines
-# Nt = 32000
-# lines = collect(range(5400.0, 5500.0, length=length(lp.λrest)))
-# templates = lp.file
-# depths = lp.depth
+@. harvey(x, p) = 4 * p[1] * p[2] / (1 + (2π * x * p[2])^2)
 
 # for i in eachindex(lp.λrest)
-    # println("\t>>> Doing " * names[i])
+# let i = 1
+i = 9
+    println("\t>>> Doing " * names[i])
 
-    # # set up stuff for synthesis
-    # Nt = 32000
-    # lines = [5576.0881]
-    # templates = [lp.file[i]]
-    # depths = [lp.depth[i]]
-    # variability = trues(length(templates))
-    # resolution = 7e5
-    # disk = DiskParams(Nt=Nt)
-    # spec = SpecParams(lines=lines, depths=depths, variability=variability,
-    #                   templates=templates, resolution=resolution)
+    # set up stuff for synthesis
+    Nt = 32000
+    lines = [5576.0881]
+    templates = [lp.file[i]]
+    depths = [lp.depth[i]]
+    variability = trues(length(templates))
+    resolution = 7e5
+    disk = DiskParams(Nt=Nt)
+    spec = SpecParams(lines=lines, depths=depths, variability=variability,
+                      templates=templates, resolution=resolution, contiguous_only=true)
 
-    # # synthesize spectra
-    # lambdas1, outspec1 = synthesize_spectra(spec, disk, seed_rng=true, verbose=true, use_gpu=true)
-
-    lambdas1 = wavs
-    outspec1 = flux
-    outspec2 = copy(outspec1)
-    GRASS.add_noise!(outspec2, 500.0)
+    # synthesize spectra
+    lambdas1, outspec1 = synthesize_spectra(spec, disk, seed_rng=false, verbose=true, use_gpu=true)
 
     # compute velocities
     println("\t>>> Calculating CCFs...")
     v_grid, ccf = calc_ccf(lambdas1, outspec1, lines, depths, 7e5)
     println("\t>>> Calculating RVs...")
     rvs, sigs = calc_rvs_from_ccf(v_grid, ccf)
-
-    println("\t>>> Calculating CCFs...again...")
-    v_grid2, ccf2 = calc_ccf(lambdas1, outspec2, lines, depths, 7e5)
-    println("\t>>> Calculating RVs...again...")
-    rvs2, sigs2 = calc_rvs_from_ccf(v_grid2, ccf2)
-
-    # save the spectra and rvs
-    #=datafile = "rms_time.jld2"
-    jldsave(datafile, lambdas1=lambdas1, outspec1=outspec1, outspec2=outspec2,
-            rvs=rvs, sigs=sigs, rvs2=rvs2, sigs2=sigs2)=#
-
-    # load the data file
-    # datafile = "rms_time.jld2"
-    # d = load(datafile)
-    # lambdas1 = d["lambdas1"]
-    # outspec1 = d["outspec1"]
-    # outspec2 = d["outspec2"]
-    # rvs = d["rvs"]
-    # sigs = d["sigs"]
-    # rvs2 = d["rvs2"]
-    # sigs2 = d["sigs2"]
-
-    # rvs = rvs[1:16000]
-    # rvs2 = rvs2[1:16000]
 
     # get power spectrum of velocities
     sampling_rate = 1.0/15.0
@@ -119,15 +81,30 @@ templates = d["templates"]
         F_binned[i] = mean(abs2.(F[j]))
     end
 
+    # throw away nans
+    idx = (.!isnan.(F_binned)) .& (freqs_bincen .>= 1e-4)
+
+    freqs_bincen_fit = copy(freqs_bincen[idx])
+    F_binned_fit = copy(F_binned[idx])
+
+    # F_binned_fit[.!idx] .= 1e3^2.0
+
+    # fit the harvey function
+    p0 = [1e3, 400.0]
+    cfit = curve_fit(harvey, freqs_bincen_fit, sqrt.(F_binned_fit), p0)
+
     # get title
-    # title = replace(names[i], "_" => "\\ ")
-    # idx = findfirst('I', title)
-    # title = title[1:idx-1] * "\\ " * title[idx:end] * "\\ \\AA"
+    title = replace(names[i], "_" => "\\ ")
+    idx = findfirst('I', title)
+    title = title[1:idx-1] * "\\ " * title[idx:end] * "\\ \\AA"
+
+    xdata = collect(10.0 .^ (range(minfreq, 0.001, step=freqstep)))
 
     # plot it
     fig, ax1 = plt.subplots()
-    ax1.scatter(freqs, abs2.(F), s=1, c="k")
-    ax1.scatter(freqs_bincen, F_binned, marker="x", c="red")
+    ax1.scatter(freqs, sqrt.(abs2.(F)), s=1, c="k")
+    ax1.scatter(freqs_bincen, sqrt.(F_binned), marker="x", c="red")
+    ax1.plot(xdata, harvey(xdata, cfit.param))
     ax1.axvline(1.0 / (60.0 * 20.0), ls=":", c="k", alpha=0.75, label=L"{\rm 20\ min.}")
     ax1.axvline(1.0 / (15.0), ls="--", c="k", alpha=0.75, label=L"{\rm 15\ sec.}")
     ax1.set_xscale("log")
@@ -137,7 +114,7 @@ templates = d["templates"]
     ax1.set_xlabel("Frequency [Hz]")
     ax1.set_ylabel(L"{\rm Power\ [(m\ s}^{-1}{\rm )}^2 {\rm \ Hz}^{-1}{\rm ]}")
     # ax1.set_xlim(1e-8, maximum(freqs))
-    # ax1.set_ylim(1, 1e5)
+    ax1.set_ylim(1, 1e5)
     # fig.savefig(joinpath(outdir, names[i] * "power_spec.pdf"))
     plt.show()
     plt.clf(); plt.close()
@@ -145,21 +122,16 @@ templates = d["templates"]
 
     # running mean on different timescales
     # in multiples of 15sec: 20*15sec = 5 min,
-    scales = range(4, 4000, step=2)
+    scales = range(4, 3000, step=2)
     rms_smooth = zeros(length(scales))
     rms_resids = zeros(length(scales))
-    rms_smooth2 = zeros(length(scales))
-    rms_resids2 = zeros(length(scales))
     for i in eachindex(scales)
         # smooth the time series
         rvs_smooth_1 = GRASS.moving_average(rvs, scales[i])
-        rvs_smooth_2 = GRASS.moving_average(rvs2, scales[i])
 
         # get smoothed rms and resid rms
         rms_smooth[i] = calc_rms(rvs_smooth_1)
         rms_resids[i] = calc_rms(rvs .- rvs_smooth_1)
-        rms_smooth2[i] = calc_rms(rvs_smooth_2)
-        rms_resids2[i] = calc_rms(rvs2 .- rvs_smooth_2)
     end
 
     # convert scale to minutes
@@ -171,8 +143,6 @@ templates = d["templates"]
     ax1.axvline(8.0 * 60.0, ls="--", c="k", alpha=0.75)
     ax1.plot(scales_min, rms_smooth, c="red", label=L"{\rm SNR} = \infty")
     ax1.plot(scales_min, rms_resids, c="green")
-    ax1.plot(scales_min, rms_smooth2, ls=":", c="red", label=L"{\rm SNR} = 500")
-    ax1.plot(scales_min, rms_resids2, ls=":", c="green")
     ax1.set_xscale("log")
     ax1.set_xlabel(L"{\rm Smoothing\ timescale\ [min.]}")
     ax1.set_ylabel(L"{\rm RMS\ RV\ [m\ s}^{-1}{\rm ]}")
@@ -181,87 +151,9 @@ templates = d["templates"]
     ax1.set_title(("\${\\rm " * title * "}\$"))
     ax1.legend()
     fig.savefig(joinpath(outdir, names[i] * "rms_smoothing.pdf"))
-    # plt.show()
-    plt.clf(); plt.close()
-# end
-
-# get ccf bisector
-vel1, int1 = GRASS.calc_bisector(v_grid, ccf, nflux=100, top=0.99)
-
-# smooth the bisector
-vel1 = GRASS.moving_average(vel1, 4)
-int1 = GRASS.moving_average(int1, 4)
-
-# calc bisector summary statistics
-bis_inv_slope1 = GRASS.calc_bisector_inverse_slope(vel1, int1)
-
-# fit to it
-xdata1 = bis_inv_slope1 .- mean(bis_inv_slope1)
-ydata1 = rvs .- mean(rvs)
-
-pfit1 = Polynomials.fit(xdata1, ydata1, 1)
-xmodel1 = range(minimum(xdata1), maximum(xdata1), length=5)
-ymodel1 = pfit1.(xmodel1)
-resids1 = pfit1.(xdata1) .- ydata1
-
-plt.scatter(bis_inv_slope1 .- mean(bis_inv_slope1), rvs .- mean(rvs), s=5, alpha=0.8)
-plt.plot(xmodel1, ymodel1, c="k")
-plt.show()
-
-# decorrelate the velocities
-rvs_to_subtract1 = pfit1.(xdata1)
-rvs_new1 = rvs .- rvs_to_subtract1
-
-
-    # get power spectrum of velocities
-    sampling_rate = 1.0/15.0
-    F = fftshift(fft(rvs_new1))
-    freqs = fftshift(fftfreq(length(rvs_new1), sampling_rate))
-
-    # throw away samplings of frequencies less than 0.0s
-    idx = findall(freqs .> 0.0)
-    F = F[idx]
-    freqs = freqs[idx]
-
-    # throw away samplings of frequencies less than 0.0s
-    idx = findall(freqs .> 0.0)
-    F = F[idx]
-    freqs = freqs[idx]
-
-    # bin the frequencies
-    minfreq = log10(minimum(freqs))
-    maxfreq = log10(maximum(freqs))
-    freqstep = 1e-1
-    freqs_binned = collect(10.0 .^ (range(minfreq, maxfreq, step=freqstep)))
-    freqs_bincen = (freqs_binned[2:end] .+ freqs_binned[1:end-1])./2
-    F_binned = zeros(length(freqs_binned)-1)
-    for i in eachindex(F_binned)
-        j = findall(x -> (x .>= freqs_binned[i]) .& (x .<= freqs_binned[i+1]), freqs)
-        F_binned[i] = mean(abs2.(F[j]))
-    end
-
-    # get title
-    # title = replace(names[i], "_" => "\\ ")
-    # idx = findfirst('I', title)
-    # title = title[1:idx-1] * "\\ " * title[idx:end] * "\\ \\AA"
-
-    # plot it
-    fig, ax1 = plt.subplots()
-    ax1.scatter(freqs, abs2.(F), s=1, c="k")
-    ax1.scatter(freqs_bincen, F_binned, marker="x", c="red")
-    ax1.axvline(1.0 / (60.0 * 20.0), ls=":", c="k", alpha=0.75, label=L"{\rm 20\ min.}")
-    ax1.axvline(1.0 / (15.0), ls="--", c="k", alpha=0.75, label=L"{\rm 15\ sec.}")
-    ax1.set_xscale("log")
-    ax1.set_yscale("log")
-    ax1.legend()
-    # ax1.set_title(("\${\\rm " * title * "}\$"))
-    ax1.set_xlabel("Frequency [Hz]")
-    ax1.set_ylabel(L"{\rm Power\ [(m\ s}^{-1}{\rm )}^2 {\rm \ Hz}^{-1}{\rm ]}")
-    # ax1.set_xlim(1e-8, maximum(freqs))
-    # ax1.set_ylim(1, 1e5)
-    # fig.savefig(joinpath(outdir, names[i] * "power_spec.pdf"))
     plt.show()
     plt.clf(); plt.close()
+# end
 
 
 #=# loop over times
