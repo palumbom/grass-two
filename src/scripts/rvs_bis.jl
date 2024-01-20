@@ -76,23 +76,19 @@ for (idx, file) in enumerate(lp.file)
     disk = DiskParams(Nt=Nt)
     spec1 = SpecParams(lines=lines, depths=depths, variability=variability,
                        blueshifts=blueshifts, templates=templates,
-                       resolution=resolution, oversampling=8.0)
+                       resolution=resolution, oversampling=1.0)
     wavs_out, flux_out = synthesize_spectra(spec1, disk, seed_rng=seed_rng,
                                             verbose=true, use_gpu=true)
-
-    # create fig + axes objects
-    fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(12.4, 7.2), gridspec_kw=Dict("width_ratios"=> [1, 1]))
-    fig.subplots_adjust(wspace=0.05)
-
 
     # set mask width
     mask_width = (GRASS.c_ms/resolution)
 
     # calculate a ccf
+    println("\t>>> Calculating CCF...")
     v_grid, ccf1 = calc_ccf(wavs_out, flux_out, lines, depths,
-                            resolutions[1], mask_width=mask_width,
+                            resolution, mask_width=mask_width,
                             mask_type=EchelleCCFs.TopHatCCFMask,
-                            Δv_step=100.0, Δv_max=32e3)
+                            Δv_step=50.0, Δv_max=32e3)
     rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1)
 
     # calculate bisector
@@ -113,9 +109,9 @@ for (idx, file) in enumerate(lp.file)
     dep = top - minimum(int)
 
     # set the BIS regions
-    b1 = 0.20
+    b1 = 0.10
     b2 = 0.40
-    b3 = 0.75
+    b3 = 0.55
     b4 = 0.90
 
     # get the BIS regions
@@ -123,6 +119,11 @@ for (idx, file) in enumerate(lp.file)
     idx40 = findfirst(x -> x .> top - b2 * dep, int[:,1])
     idx55 = findfirst(x -> x .> top - b3 * dep, int[:,1])
     idx90 = findfirst(x -> x .> top - b4 * dep, int[:,1])
+
+    # create fig + axes objects
+    println("\t>>> Plotting...")
+    fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(12.8, 7.2), gridspec_kw=Dict("width_ratios"=> [1, 1]))
+    fig.subplots_adjust(wspace=0.05)
 
     # plot the bis regions
     ax1.axhline(int[idx10,1], ls="--", c="k")
@@ -133,19 +134,19 @@ for (idx, file) in enumerate(lp.file)
     # get BIS
     bis_inv_slope = GRASS.calc_bisector_inverse_slope(bis, int, b1=b1, b2=b2, b3=b3, b4=b4)
 
-    # mean subtract the bisector plotting
-    mean_bis = dropdims(mean(bis, dims=2), dims=2)[5:end-1]
-    mean_int = dropdims(mean(int, dims=2), dims=2)[5:end-1]
+    # mean subtract the bisector plotting (remove bottommost and topmost measurements)
+    mean_bis = dropdims(mean(bis, dims=2), dims=2)[3:end-1]
+    mean_int = dropdims(mean(int, dims=2), dims=2)[3:end-1]
     bis .-= mean(mean_bis)
 
     # plot the variability in bisector on exaggerated scale
     for i in 1:20
-        bis_i = view(bis, :, i)[5:end-1]
-        int_i = view(int, :, i)[5:end-1]
+        bis_i = view(bis, :, i)[3:end-1]
+        int_i = view(int, :, i)[3:end-1]
 
-        delt_bis = (mean_bis .- mean(mean_bis) .- bis_i) .* 25.0
+        delt_bis = (mean_bis .- mean(mean_bis) .- bis_i) .* 50.0
         if i == 1
-            ax1.plot(mean_bis .- mean(mean_bis) .+ delt_bis, int_i, alpha=0.15, c=colors[1], lw=2.0, label=L"{\rm Bisector\ Variability}")
+            ax1.plot(mean_bis .- mean(mean_bis) .+ delt_bis, int_i, alpha=0.15, c=colors[1], lw=2.0, label=L"{\rm Bisector\ Variations}")
         else
             ax1.plot(mean_bis .- mean(mean_bis) .+ delt_bis, int_i, alpha=0.15, c=colors[1], lw=2.0)
         end
@@ -173,7 +174,7 @@ for (idx, file) in enumerate(lp.file)
 
     # plot BIS and apparent RV
     ax2.scatter(xdata, ydata, c=colors[1], s=4)
-    ax2.plot(xmodel, ymodel, c=colors[1], path_effects=path_effects, ls="--", label=L"{\rm Slope } \approx\ " * fit_label, lw=2.5)
+    ax2.plot(xmodel, ymodel, c=colors[1], path_effects=path_effects, ls="--", lw=2.5)#, label=L"{\rm Slope } \approx\ " * fit_label)
 
     # set font sizes
     title_font = 26
@@ -189,14 +190,15 @@ for (idx, file) in enumerate(lp.file)
 
     # set plot stuff for second plot
     ax2.tick_params(axis="both", which="major", labelsize=tick_font+4)
-    ax2.legend(loc="upper right", fontsize=legend_font, ncol=1,
-              columnspacing=0.8, handletextpad=0.5, labelspacing=0.08)
+    # ax2.legend(loc="upper right", fontsize=legend_font, ncol=1,
+    #           columnspacing=0.8, handletextpad=0.5, labelspacing=0.08)
     ax2.yaxis.tick_right()
     ax2.yaxis.set_label_position("right")
     ax2.set_xlabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m\ s}^{-1}{\rm )}", fontsize=title_font)#, x=0.03, y=0.52)
     ax2.set_ylabel(L"{\rm RV\ - \overline{\rm RV}\ } {\rm (m\ s}^{-1}{\rm )}", fontsize=title_font)#, x=0.55, y=0.05)
 
     fig.tight_layout()
-    fig.savefig(joinpath(outdir, "rv_vs_bis.pdf"), bbox_inches="tight")
-    plt.close("all")
+    plt.show()
+    # fig.savefig(joinpath(outdir, "rv_vs_bis.pdf"), bbox_inches="tight")
+    # plt.close("all")
 end

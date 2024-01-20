@@ -49,7 +49,7 @@ resolutions = d["resolutions"]
 rvs_std_out = d["rvs_std_out"]
 rvs_std_decorr_out = d["rvs_std_decorr_out"]
 
-norm = mpl.colors.LogNorm(vmin=0.15, vmax=0.60)
+cnorm = mpl.colors.LogNorm(vmin=0.3, vmax=0.60)
 
 # plot heatmap at each resolution
 for i in eachindex(resolutions)
@@ -62,8 +62,8 @@ for i in eachindex(resolutions)
     # println(minimum(rvs_std_decorr_view))
 
     fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(12.8, 8.6))
-    img1 = ax1.imshow(rvs_std_view, cmap="viridis_r", origin="lower", norm=norm)
-    img2 = ax2.imshow(rvs_std_decorr_view, cmap="viridis_r", origin="lower", norm=norm)
+    img1 = ax1.imshow(rvs_std_view, cmap="viridis_r", origin="lower", norm=cnorm)
+    img2 = ax2.imshow(rvs_std_decorr_view, cmap="viridis_r", origin="lower", norm=cnorm)
 
     formatter = mpl.ticker.LogFormatter(10, labelOnlyBase=false)
 

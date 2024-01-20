@@ -21,7 +21,7 @@ mpl.style.use(GRASS.moddir * "fig.mplstyle")
 colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 # get command line args and output directories
-include("paths.jl")#joinpath(abspath(@__DIR__), "paths.jl"))
+include(joinpath(abspath(@__DIR__), "paths.jl"))
 plotdir = string(figures)
 datafile = string(abspath(joinpath(data, "rms_table.csv")))
 
@@ -80,6 +80,14 @@ for i in eachindex(lp.λrest)
         spec = SpecParams(lines=lines, depths=depths, templates=templates)
         wavs, flux = synthesize_spectra(spec, disk, verbose=false, use_gpu=true)
 
+        # measure bisector
+        bis, int = GRASS.calc_bisector(wavs, flux, nflux=100, top=0.99)
+
+        # convert bis to velocity scale
+        for i in 1:Nt
+            bis[:, i] = (bis[:,i] .- lines[1]) * GRASS.c_ms / lines[1]
+        end
+
         # measure velocities
         v_grid, ccf = calc_ccf(wavs, flux, spec, Δv_step=50.0, Δv_max=30e3)
         rvs, sigs = calc_rvs_from_ccf(v_grid, ccf)
@@ -87,19 +95,16 @@ for i in eachindex(lp.λrest)
         # set the rms in the table
         raw_rms[k] = calc_rms(rvs)
 
-        # measure ccf bisector
-        vel, int = GRASS.calc_bisector(v_grid, ccf, nflux=100, top=0.99)
-
         # smooth the bisector and cut off bottom and top measurements
-        vel = GRASS.moving_average(vel, 4)[3:end-1, :]
+        bis = GRASS.moving_average(bis, 4)[3:end-1, :]
         int = GRASS.moving_average(int, 4)[3:end-1, :]
 
         # calculate summary statistics
-        bis_inv_slope = GRASS.calc_bisector_inverse_slope(vel, int)
-        bis_span = GRASS.calc_bisector_span(vel, int)
-        bis_slope = GRASS.calc_bisector_slope(vel, int)
-        bis_curve = GRASS.calc_bisector_curvature(vel, int)
-        bis_bot = GRASS.calc_bisector_bottom(vel, int, rvs)
+        bis_inv_slope = GRASS.calc_bisector_inverse_slope(bis, int)
+        bis_span = GRASS.calc_bisector_span(bis, int)
+        bis_slope = GRASS.calc_bisector_slope(bis, int)
+        bis_curve = GRASS.calc_bisector_curvature(bis, int)
+        bis_bot = GRASS.calc_bisector_bottom(bis, int, rvs)
 
         # set up holder for summary statistis and loop over it
         holder = [bis_inv_slope, bis_span, bis_slope, bis_curve, bis_bot]
@@ -141,120 +146,3 @@ for i in eachindex(lp.λrest)
 end
 
 CSV.write(datafile, df)
-
-# read in the data file
-df = CSV.read(datafile, DataFrame)
-
-# read in the line info with formation temperature
-tempfile = joinpath(GRASS.moddir, "data", "line_info.csv")
-df2 = CSV.read(tempfile, DataFrame)
-rename!(df2, :name=>:line)
-
-idx = []
-for i in 1:length(df2.line)
-    if df2.line[i] in df.line
-        push!(idx, i)
-    end
-end
-
-df[!, "avg_temp_50"] = df2.avg_temp_50[idx]
-df[!, "avg_temp_80"] = df2.avg_temp_80[idx]
-
-# make a colorbar
-cmap = plt.cm.inferno
-dat = df.avg_temp_50
-cnorm = mpl.colors.Normalize(vmin=minimum(dat), vmax=maximum(dat))
-smap = plt.cm.ScalarMappable(cmap=cmap, norm=cnorm)
-
-# now plot the data
-fig, ax1 = plt.subplots()
-ax1.errorbar(df.raw_rms, df.bis_inv_slope_rms, xerr=df.raw_rms_sig, yerr=df.bis_inv_slope_sig, linestyle="none", c="k", capsize=0.5, zorder=0)
-ax1.scatter(df.raw_rms, df.bis_inv_slope_rms, marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap)
-
-# plot the one to one line
-xmin, xmax = ax1.get_xlim()
-ax1.plot(range(xmin, xmax, length=3), range(xmin, xmax, length=3), c="k", ls="--")
-
-cbar = fig.colorbar(smap, ax=ax1)
-# cbar.ax.tick_params(labelsize=11)
-cbar.ax.set_ylabel(L"{\rm T}_{1/2}\ {\rm (K)}")
-
-ax1.set_xlabel(L"{\rm RV\ RMS\ (m\ s}^{-1}{\rm )}")
-ax1.set_ylabel(L"{\rm BIS\ RMS\ (m\ s}^{-1}{\rm )}")
-
-fig.savefig(joinpath(plotdir, "rms_vs_rms.pdf"))
-# plt.show()
-plt.clf(); plt.close()
-
-
-# now plot rms stair plot thing
-ydata = df.raw_rms
-yerrs = df.raw_rms_sig
-
-# sort the data in descending order
-idx = reverse(sortperm(ydata))
-
-xdata = range(1, length(ydata), step=1)
-
-# get ticks and tick labels
-xticks = xdata
-xticklabels = []
-for i in eachindex(name)
-    title = replace(name[i], "_" => "\\ ")
-    tidx = findfirst("I", title)
-    title = "\${\\rm " * title * "\\ \\AA }\$"
-    push!(xticklabels, title)
-end
-
-fig, ax1 = plt.subplots(figsize=(9.2,4.8))
-
-ax1.errorbar(xdata, ydata[idx], yerr=yerrs[idx], linestyle="none", c="k", capsize=0.5, zorder=0)
-ax1.scatter(xdata, ydata[idx], marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap)
-
-cbar = fig.colorbar(smap, ax=ax1)
-# cbar.ax.tick_params(labelsize=11)
-cbar.ax.set_ylabel(L"{\rm T}_{1/2}\ {\rm (K)}")
-
-ax1.set_ylabel(L"{\rm RV\ RMS\ (m\ s}^{-1}{\rm )}")
-
-ax1.set_xticks(xticks)
-ax1.set_xticklabels(xticklabels[idx], rotation=90)
-ax1.grid(false)
-
-fig.tight_layout()
-fig.savefig(joinpath(plotdir, "rms_ladder.pdf"), bbox_inches="tight")
-plt.clf(); plt.close()
-
-# plot rms vs temp
-# fig, axs = plt.subplots(figsize=(12.4,4.8), ncols=3, nrows=1, sharey=true)
-fig, ax1 = plt.subplots()
-# ax1, ax2, ax3 = axs
-
-ax1.errorbar(df.avg_temp_50, df.raw_rms, yerr=df.raw_rms_sig, linestyle="none", c="k", capsize=0.5, zorder=0)
-ax1.scatter(df.avg_temp_50, df.raw_rms, marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap)
-
-# ax1.set_xlim(minimum(df.avg_temp_50), maximum(df.avg_temp_50))
-# ax1.set_ylim(minimum(df.raw_rms), maximum(df.raw_rms))
-
-# ax2.errorbar(depth, df.raw_rms, yerr=df.raw_rms_sig, linestyle="none", c="k", capsize=0.5, zorder=0)
-# ax2.scatter(depth, df.raw_rms, marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap)
-
-# ax3.errorbar(λrest, df.raw_rms, yerr=df.raw_rms_sig, linestyle="none", c="k", capsize=0.5, zorder=0)
-# derp = ax3.scatter(λrest, df.raw_rms, marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap)
-
-# cbar = fig.colorbar(smap, ax=ax3)
-cbar = fig.colorbar(smap, ax=ax1)
-# cbar.ax.tick_params(labelsize=11)
-cbar.ax.set_ylabel(L"{\rm T}_{1/2}\ {\rm (K)}")
-
-ax1.set_xlabel(L"{\rm T}_{1/2}\ {\rm (K)}")
-# ax2.set_xlabel(L"{\rm Depth}")
-# ax3.set_xlabel(L"{\rm Wavelength\ (\AA)}")
-ax1.set_ylabel(L"{\rm RV\ RMS\ (m\ s}^{-1}{\rm )}")
-
-fig.tight_layout()
-fig.subplots_adjust(hspace=0.1, wspace=0.075)
-fig.savefig(joinpath(plotdir, "rms_vs_temp.pdf"), bbox_inches="tight")
-plt.clf(); plt.close()
-
-
