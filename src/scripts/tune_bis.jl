@@ -42,10 +42,10 @@ line_titles = replace.(line_names, "_" => " ")
 line_files = GRASS.get_file(lp)
 
 # set number of loops
-Nloops = 2
+Nloops = 8
 
 # set number of levels tried
-number_levels = 3#50
+number_levels = 100
 
 # set up array to hold BIS levels
 b1_array = zeros(number_levels)
@@ -58,7 +58,7 @@ r_array = zeros(number_levels, Nloops)
 
 # set up parameters for synthesis
 Nt = 160
-lines = [5434.5232]
+lines = [rest_wavelengths[template_idx]]
 templates = [template]
 blueshifts = zeros(length(lines))
 depths = [line_depths[template_idx]]
@@ -66,7 +66,8 @@ resolution = 7e5
 
 # synthesize the line
 disk = DiskParams(Nt=Nt)
-spec = SpecParams(lines=lines, depths=depths, templates=templates, oversampling=4.0)
+spec = SpecParams(lines=lines, depths=depths, templates=templates,
+                  blueshifts=blueshifts, oversampling=3.0)
 
 # do an initial synthesis to get the width (and precompile methods)
 wavs0, flux0 = synthesize_spectra(spec, disk, verbose=false, use_gpu=true)
@@ -135,5 +136,3 @@ end
 # save the results to a file
 datafile = string(abspath(joinpath(data, template * "_tune_bis.jld2")))
 jldsave(datafile, b1=b1_array, b2=b2_array, b3=b3_array, b4=b4_array, r_array=r_array)
-
-@show r_array
