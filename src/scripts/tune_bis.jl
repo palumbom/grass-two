@@ -42,10 +42,10 @@ line_titles = replace.(line_names, "_" => " ")
 line_files = GRASS.get_file(lp)
 
 # set number of loops
-Nloops = 8
+Nloops = 32
 
 # set number of levels tried
-number_levels = 100
+number_levels = 500
 
 # set up array to hold BIS levels
 b1_array = zeros(number_levels)
@@ -74,8 +74,8 @@ wavs0, flux0 = synthesize_spectra(spec, disk, verbose=false, use_gpu=true)
 v_grid0, ccf0 = calc_ccf(wavs0, flux0, spec)
 rvs0, sigs0= calc_rvs_from_ccf(v_grid0, ccf0)
 
-# get width of line at ~92.5% flux
-idxl, idxr = GRASS.find_wing_index(0.925, mean(flux0, dims=2)[:,1])
+# get width of line at ~95% flux
+idxl, idxr = GRASS.find_wing_index(0.95, mean(flux0, dims=2)[:,1])
 
 # get width in angstroms
 width_ang = wavs0[idxr] - wavs0[idxl]
@@ -84,8 +84,13 @@ width_ang = wavs0[idxr] - wavs0[idxl]
 width_vel = GRASS.c_ms * width_ang / wavs0[argmin(flux0[:,1])]
 
 # allocate memory that will be reused in ccf computation
-Δv_step = 100.0
-Δv_max = round((width_vel + 1e3)/100) * 100; @show Δv_max
+Δv_step = 50.0
+Δv_max = round((width_vel + 1e3)/100) * 100
+if Δv_max < 15e3
+    Δv_max = 15e3
+end
+@show Δv_max
+
 v_grid = range(-Δv_max, Δv_max, step=Δv_step)
 projection = zeros(length(spec.lambdas), 1)
 proj_flux = zeros(length(spec.lambdas))
@@ -94,10 +99,10 @@ ccf1 = zeros(length(v_grid), Nt)
 # iterate over BIS regions
 for i in 1:number_levels
     # draw BIS levels
-    b1 = rand(Uniform(0.10, 0.80), 1)[1]
-    b2 = rand(Uniform(b1, 0.85), 1)[1]
+    b1 = rand(Uniform(0.10, 0.75), 1)[1]
+    b2 = rand(Uniform(b1 + 0.05, 0.8), 1)[1]
     b3 = rand(Uniform(b2, 0.85), 1)[1]
-    b4 = rand(Uniform(b3, 0.90), 1)[1]
+    b4 = rand(Uniform(b3 + 0.05, 0.90), 1)[1]
 
     # set the values in the array
     b1_array[i] = b1

@@ -90,7 +90,7 @@ if maximum(abs.(resids64)) < 1e-13
     ax2.set_ylim(-1.1e-14, 1.1e-14)
     ax2.ticklabel_format(axis="y", useOffset=true, style="sci")
     ax2.yaxis.offsetText.set_visible(false)
-    ax2.set_ylabel(L"({\rm Flux}_{\rm CPU} - {\rm Flux}_{\rm GPU}) \times 10^{-14}", fontsize=15)
+    ax2.set_ylabel(L"({\rm Flux}_{\rm CPU} - {\rm Flux}_{\rm GPU}) \times 10^{14}", fontsize=15)
 end
 
 if maximum(abs.(resids32)) < 1e-2
@@ -99,7 +99,7 @@ if maximum(abs.(resids32)) < 1e-2
     ax3.yaxis.offsetText.set_visible(false)
     ax3.set_yticks([-1.0e-3, -0.5e-3, 0.0, 0.5e-3, 1.0e-3])
     ax3.set_yticklabels([L"-1.0", L"-0.5", L"0.0", L"0.5", L"1.0"])
-    ax3.set_ylabel(L"({\rm Flux}_{\rm CPU} - {\rm Flux}_{\rm GPU}) \times 10^{-3}", fontsize=15)
+    ax3.set_ylabel(L"({\rm Flux}_{\rm CPU} - {\rm Flux}_{\rm GPU}) \times 10^{3}", fontsize=15)
 end
 
 legend = ax1.legend(loc="lower left", mode="expand", ncol=3, fontsize=12.5,
