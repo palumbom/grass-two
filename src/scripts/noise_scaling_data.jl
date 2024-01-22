@@ -63,7 +63,7 @@ wavs0, flux0 = synthesize_spectra(spec0, disk0, seed_rng=seed_rng,
 disk = DiskParams(Nt=Nt)
 spec1 = SpecParams(lines=lines, depths=depths, blueshifts=blueshifts,
                    variability=variability, templates=templates,
-                   resolution=resolution)
+                   resolution=resolution, oversampling=1.0)
 wavs, flux = synthesize_spectra(spec1, disk, seed_rng=seed_rng,
                                 verbose=true, use_gpu=true)
 

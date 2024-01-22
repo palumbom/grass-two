@@ -36,9 +36,26 @@ for colname, coldata in df.items():
 
 
 # make table with raw rms values
-df.to_latex(buf=tabfile1, na_rep="_", index=False, columns=["line", "raw_rms", "raw_rms_sig"])
+df.to_latex(buf=tabfile1, na_rep="-", index=False, columns=["line", "raw_rms", "raw_rms_sig"])
 
 # make table with decorrelation and correlation coefficietns
 df.to_latex(buf=tabfile2, na_rep="-", index=False)
 
 # pdb.set_trace()
+
+# now make the tuned BIS table
+datfile = datadir + ("tuned_params.csv")
+df = pd.read_csv(datfile)
+
+for i in range(len(df.line)):
+    ln = df.line[i]
+    ln = ln.replace("_", " ")
+    idx = ln.index("I")
+    ln = ln[0:idx] + " " + ln[idx:]
+    df.iloc[i, 0] = ln
+
+# round to appropriate number of decimal places
+df.med_pearson = np.round(df.med_pearson, decimals=3)
+
+tabfile3 = datadir + ("tuned_params.tex")
+df.to_latex(buf=tabfile3, na_rep="-", index=False)

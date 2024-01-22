@@ -45,7 +45,7 @@ df = DataFrame(line=name, raw_rms=zeros(length(name)), raw_rms_sig=zeros(length(
 holder_names = ["bis_inv_slope", "bis_span", "bis_curve", "bis_tuned"]
 
 # set number of loops
-Nloops = 500
+Nloops = 200
 
 raw_rms = zeros(Nloops)
 rms_dict = Dict("bis_inv_slope"=>zeros(Nloops),
@@ -63,10 +63,6 @@ bis_df = CSV.read(joinpath(data, "tuned_params.csv"), DataFrame)
 
 # loop over lines
 for i in eachindex(lp.λrest)
-    if name[i] != "FeI_5434"
-        continue
-    end
-
     # print status
     println("\t>>> Template: " * name[i])
 
@@ -87,7 +83,8 @@ for i in eachindex(lp.λrest)
 
     # initialize objects
     disk = DiskParams(Nt=Nt)
-    spec = SpecParams(lines=lines, depths=depths, templates=templates, blueshifts=blueshifts, oversampling=3.0)
+    spec = SpecParams(lines=lines, depths=depths, templates=templates,
+                      blueshifts=blueshifts, oversampling=1.0)
 
     # do an initial synthesis to get the width (and precompile methods)
     wavs0, flux0 = synthesize_spectra(spec, disk, verbose=false, use_gpu=true)
@@ -104,7 +101,7 @@ for i in eachindex(lp.λrest)
     width_vel = GRASS.c_ms * width_ang / wavs0[argmin(flux0[:,1])]
 
     # allocate memory that will be reused in ccf computation
-    Δv_step = 50.0
+    Δv_step = 100.0
     Δv_max = round((width_vel + 1e3)/100) * 100
     if Δv_max < 15e3
         Δv_max = 15e3
@@ -119,7 +116,8 @@ for i in eachindex(lp.λrest)
 
     # number of loops
     for k in 1:Nloops
-        println("\t\t>>> Loop " * string(k) * " of " * string(Nloops))
+        # print loop status
+        # println("\t\t>>> Loop " * string(k) * " of " * string(Nloops))
 
         # synthesize the line
         wavs, flux = synthesize_spectra(spec, disk, verbose=false, use_gpu=true)
@@ -134,8 +132,9 @@ for i in eachindex(lp.λrest)
 
         # measure velocities
         GRASS.calc_ccf!(v_grid, projection, proj_flux, ccf, wavs, flux, lines,
-                        depths, resolution, Δv_step=Δv_step, Δv_max=Δv_max)
-        rvs, sigs = calc_rvs_from_ccf(v_grid, ccf)
+                        depths, resolution, Δv_step=Δv_step, Δv_max=Δv_max,
+                        mask_type=EchelleCCFs.GaussianCCFMask)
+        rvs, sigs = calc_rvs_from_ccf(v_grid, ccf, frac_of_width_to_fit=0.5)
 
         # set the rms in the table
         raw_rms[k] = calc_rms(rvs)

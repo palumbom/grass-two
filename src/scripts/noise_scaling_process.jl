@@ -69,7 +69,7 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
         width_vel = GRASS.c_ms * width_ang / wavs_degd[pks[1]]
 
         # get the velocity step and velocity window for CCF
-        Δv_step = 50.0
+        Δv_step = 100.0
         Δv_max = round((width_vel + 1e3)/100) * 100
 
         v_grid = range(-Δv_max, Δv_max, step=Δv_step)
@@ -115,10 +115,10 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
 
             # calculate ccf
             GRASS.calc_ccf!(v_grid, projection, proj_flux, ccf1,
-                            wavs_view, flux_view, ls, ds,
-                            resolutions[i], Δv_step=Δv_step,
-                            Δv_max=Δv_max)
-            rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1)
+                            wavs_view, flux_view, ls, ds, resolutions[i],
+                            Δv_step=Δv_step, Δv_max=Δv_max,
+                            mask_type=EchelleCCFs.GaussianCCFMask)
+            rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1, frac_of_width_to_fit=0.5)
             rvs_std[i,j] = std(rvs1)
 
             # get ccf bisector

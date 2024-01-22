@@ -67,7 +67,7 @@ resolution = 7e5
 # synthesize the line
 disk = DiskParams(Nt=Nt)
 spec = SpecParams(lines=lines, depths=depths, templates=templates,
-                  blueshifts=blueshifts, oversampling=3.0)
+                  blueshifts=blueshifts, oversampling=2.0)
 
 # do an initial synthesis to get the width (and precompile methods)
 wavs0, flux0 = synthesize_spectra(spec, disk, verbose=false, use_gpu=true)
@@ -84,7 +84,7 @@ width_ang = wavs0[idxr] - wavs0[idxl]
 width_vel = GRASS.c_ms * width_ang / wavs0[argmin(flux0[:,1])]
 
 # allocate memory that will be reused in ccf computation
-Δv_step = 50.0
+Δv_step = 100.0
 Δv_max = round((width_vel + 1e3)/100) * 100
 if Δv_max < 15e3
     Δv_max = 15e3
@@ -116,8 +116,9 @@ for i in 1:number_levels
 
         # measure velocities
         GRASS.calc_ccf!(v_grid, projection, proj_flux, ccf1, wavs, flux, lines,
-                        depths, resolution, Δv_step=Δv_step, Δv_max=Δv_max)
-        rvs, sigs = calc_rvs_from_ccf(v_grid, ccf1)
+                        depths, resolution, Δv_step=Δv_step, Δv_max=Δv_max,
+                        mask_type=EchelleCCFs.GaussianCCFMask)
+        rvs, sigs = calc_rvs_from_ccf(v_grid, ccf1, frac_of_width_to_fit=0.50)
 
         # measure bisector
         bis, int = GRASS.calc_bisector(wavs, flux, nflux=100, top=0.99)
