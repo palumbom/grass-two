@@ -52,17 +52,10 @@ rest_wavelengths = GRASS.get_rest_wavelength(lp)
 line_depths = GRASS.get_depth(lp)
 line_names = GRASS.get_name(lp)
 
-# decide whether to inject velocitie2
-inject = false
-
-# for (idx, file) in enumerate(lp.file)
-#     if !contains(file, "FeII_6149")
-#         continue
-#     end
-
-    # idx = 4
-    idx = 9
-    file = lp.file[idx]
+for (idx, file) in enumerate(lp.file)
+    # if !contains(file, "TiII_5381")
+    #     continue
+    # end
 
     # get line title
     title = replace(line_names[idx], "_" => "\\ ")
@@ -83,9 +76,12 @@ inject = false
     disk = DiskParams(Nt=Nt)
     spec1 = SpecParams(lines=lines, depths=depths, variability=variability,
                        blueshifts=blueshifts, templates=templates,
-                       resolution=resolution, oversampling=1.0)
+                       resolution=resolution, oversampling=2.0)
     wavs_out, flux_out = synthesize_spectra(spec1, disk, seed_rng=seed_rng,
                                             verbose=true, use_gpu=true)
+
+    # convolve down and oversample
+    # wavs_out, flux_out = GRASS.convolve_gauss(wavs_out, flux_out, new_res=6e5, oversampling=4.0)
 
     # set mask width
     mask_width = (GRASS.c_ms/resolution)
@@ -99,13 +95,13 @@ inject = false
     rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1, frac_of_width_to_fit=0.5)
 
     # calculate bisector
-    # bis, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
-    bis, int = GRASS.calc_bisector(wavs_out, flux_out, nflux=100, top=0.99)
+    bis, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
 
     # convert bis to velocity scale
-    for i in 1:Nt
-        bis[:, i] = (bis[:,i] .- lines[1]) * GRASS.c_ms / lines[1]
-    end
+    # bis, int = GRASS.calc_bisector(wavs_out, flux_out, nflux=80, top=0.99)
+    # for i in 1:Nt
+    #     bis[:, i] = (bis[:,i] .- lines[1]) * GRASS.c_ms / lines[1]
+    # end
 
     # get continuum and depth
     top = 1.0
@@ -134,18 +130,18 @@ inject = false
     ax1.axhline(int[idx55,1], ls=":", c="k")
     ax1.axhline(int[idx90,1], ls=":", c="k")
 
-    # smooth bisector for plotting
-    bis = GRASS.moving_average(bis, 4)
-    int = GRASS.moving_average(int, 4)
-
     # get BIS
     bis_inv_slope = GRASS.calc_bisector_inverse_slope(bis, int)#, b1=b1, b2=b2, b3=b3, b4=b4)
     bis_amplitude = GRASS.calc_bisector_span(bis, int)
     # bis_amplitude = maximum(dropdims(minimum(int, dims=1), dims=1)) .- dropdims(minimum(int, dims=1), dims=1)
     bis_curvature = GRASS.calc_bisector_curvature(bis, int)
 
+    # smooth bisector for plotting
+    bis = GRASS.moving_average(bis, 4)
+    int = GRASS.moving_average(int, 4)
+
     # mean subtract the bisector plotting (remove bottommost and topmost measurements)
-    idx_start = 3
+    idx_start = 4
     idx_d_end = 1
     mean_bis = dropdims(mean(bis, dims=2), dims=2)[idx_start:end-idx_d_end]
     mean_int = dropdims(mean(int, dims=2), dims=2)[idx_start:end-idx_d_end]
@@ -245,6 +241,7 @@ inject = false
 
     fig.tight_layout()
     fig.subplots_adjust(wspace=0.05)
-    fig.savefig(joinpath(outdir, "rvs_bis.pdf"), bbox_inches="tight")
+    # fig.savefig(joinpath(outdir, "rvs_bis.pdf"), bbox_inches="tight")
+    plt.show()
     plt.close("all")
-# end
+end

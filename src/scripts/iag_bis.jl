@@ -8,6 +8,7 @@ using Optim
 using LsqFit
 using Statistics
 using DataFrames
+using EchelleCCFs
 using EchelleCCFs: λ_air_to_vac, calc_doppler_factor, MeasureRvFromCCFQuadratic as QuadraticFit
 
 # plotting
@@ -19,6 +20,7 @@ colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
 plotdir = string(abspath(joinpath(figures, "iag_comparison")))
+datadir = string(abspath(data))
 
 if !isdir(plotdir)
     mkdir(plotdir)
@@ -134,9 +136,12 @@ function main()
     files = GRASS.get_file(lp)
     line_names = GRASS.get_name(lp)
 
+    # dataframe for optimized depth
+    df_dep = DataFrame("line" => line_names, "optimized_depth" => zeros(length(line_names)))
+
     # wavelength of line to synthesize/compare to iag
     for (i, file) in enumerate(files)
-        # if !contains(file, "FeI_5434")
+        # if !contains(file, "FeI_5250.6")
         #     continue
         # end
         println(">>> Running " * line_names[i] * "...")
@@ -188,31 +193,37 @@ function main()
         options = Optim.Options(f_abstol=1e-3, outer_f_abstol=1e-3, iterations=50, outer_iterations=50)
         results = optimize(depth_diff, lb, ub, [iag_depth], optimizer, options)
         sim_depth = results.minimizer[1]
+        df_dep[i, "optimized_depth"] = sim_depth
         println("\t>>> Optimized depth = " * string(sim_depth))
 
         # simulate the spectrum
         lines = [airwav]
         depths = [sim_depth]
         templates = [file]
-        resolution = 1e6
+        resolution = 7e5
         spec = SpecParams(lines=lines, depths=depths, templates=templates,
-                          resolution=resolution, buffer=1.5)
-        disk = DiskParams(Nt=50)
+                          resolution=resolution, buffer=1.5, oversampling=2.0)
+        disk = DiskParams(Nt=100)
 
         # simulate the spectrum
         wavs_sim, flux_sim = synthesize_spectra(spec, disk, use_gpu=use_gpu,
                                                 verbose=false, seed_rng=true)
         flux_sim = dropdims(mean(flux_sim, dims=2), dims=2)
 
-        # get bisector for IAG and synthetic spectra
-        bis_iag, int_iag = GRASS.calc_bisector(view(wavs_iag, idxl:idxr),
-                                               view(flux_iag, idxl:idxr),
-                                               nflux=50, top=0.9)
-        bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=50, top=0.9)
+        # calculate ccfs for spectra
+        v_grid, ccf_iag = GRASS.calc_ccf(wavs_iag,#view(wavs_iag, idxl:idxr),
+                                         flux_iag,#view(flux_iag, idxl:idxr),
+                                         lines, depths,
+                                         7e5, Δv_step=100.0, Δv_max=15e3,
+                                         mask_type=EchelleCCFs.GaussianCCFMask)
 
-        # convert wavelengths to vel grids
-        vel_iag = GRASS.c_ms .* (bis_iag .- airwav) ./ (airwav)
-        vel_sim = GRASS.c_ms .* (bis_sim .- airwav) ./ (airwav)
+        v_grid, ccf_sim = GRASS.calc_ccf(wavs_sim, flux_sim, lines, depths,
+                                         7e5, Δv_step=100.0, Δv_max=15e3,
+                                         mask_type=EchelleCCFs.GaussianCCFMask)
+
+        # get bisectors
+        vel_iag, int_iag = GRASS.calc_bisector(v_grid, ccf_iag, nflux=50, top=0.9)
+        vel_sim, int_sim = GRASS.calc_bisector(v_grid, ccf_sim, nflux=50, top=0.9)
 
         # compute velocity as mean bisector between N and M % depth
         N = 0.1
@@ -255,21 +266,17 @@ function main()
         # mod_depth = 1.0 - minimum(flux_mod)
 
         # recompute bisectors b/c of interpolation
-        bis_sim, int_sim = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=50, top=0.9)
-        bis_iag, int_iag = GRASS.calc_bisector(view(wavs_iag, idxl:idxr),
-                                               view(flux_iag, idxl:idxr),
-                                               nflux=50, top=0.9)
+        v_grid, ccf_iag = GRASS.calc_ccf(wavs_iag,#view(wavs_iag, idxl:idxr),
+                                         flux_iag,#view(flux_iag, idxl:idxr),
+                                         lines, depths,
+                                         7e5, Δv_step=100.0, Δv_max=15e3,
+                                         mask_type=EchelleCCFs.GaussianCCFMask)
 
-
-        # bis_mod, int_mod = GRASS.calc_bisector(wavs_iag, flux_mod, nflux=50, top=0.9)
-
-        bis_sim2, int_sim2 = GRASS.calc_bisector(wavs_sim, flux_sim, nflux=60, top=0.99)
-
-        # transform bisectors to velocities
-        vel_sim = GRASS.c_ms .* (bis_sim .- airwav) ./ (airwav)
-        vel_sim2 = GRASS.c_ms .* (bis_sim2 .- airwav) ./ (airwav)
-        vel_iag = GRASS.c_ms .* (bis_iag .- airwav) ./ (airwav)
-        # vel_mod = GRASS.c_ms .* (bis_mod .- airwav) ./ (airwav)
+        v_grid, ccf_sim = GRASS.calc_ccf(wavs_sim, flux_sim, lines, depths,
+                                         7e5, Δv_step=100.0, Δv_max=15e3,
+                                         mask_type=EchelleCCFs.GaussianCCFMask)
+        vel_iag, int_iag = GRASS.calc_bisector(v_grid, ccf_iag, nflux=50, top=0.9)
+        vel_sim, int_sim = GRASS.calc_bisector(v_grid, ccf_sim, nflux=50, top=0.9)
 
         # find mean velocities in order to align bisectors
         N = 0.10
@@ -309,7 +316,6 @@ function main()
         vel_iag .-= rv_iag
         # vel_mod .-= rv_mod
 
-
         # big function for plotting
         function comparison_plots()
             # make plot objects
@@ -327,16 +333,21 @@ function main()
             ax2.plot(wavs_sim, flux_iag .- flux_sim, c=colors[1], marker="s", ms=2.0, lw=0, markevery=2)
             # ax2.plot(wavs_sim, flux_mod .- flux_sim, c=colors[2], marker="^", ms=2.0, lw=0, markevery=2)
 
+            # find limits
+            idx_min = argmin(flux_sim)
+            idx1 = idx_min - findfirst(x -> x .> 0.95, flux_sim[idx_min:-1:1])
+            idx2 = idx_min + findfirst(x -> x .> 0.95, flux_sim[idx_min:end])
+
             # set limits
             min_idx = argmin(flux_iag)
-            ax1.set_xlim(airwav - 0.5, airwav + 0.5)
+            ax1.set_xlim(wavs_sim[idx1-50], wavs_sim[idx2+50])
             ax1.set_ylim(minimum(flux_sim) - 0.1, 1.1)
-            ax2.set_xlim(airwav - 0.5, airwav + 0.5)
+            ax2.set_xlim(wavs_sim[idx1-50], wavs_sim[idx2+50])
             ax2.set_ylim(-0.125, 0.125)
 
             # set tick labels, axis labels, etc.
             ax1.set_xticklabels([])
-            ax1.set_ylabel(L"{\rm Normalized\ Flux}", labelpad=10)
+            ax1.set_ylabel(L"{\rm Normalized\ Flux}", labelpad=15)
             ax2.set_xlabel(L"{\rm Wavelength\ (\AA)}")
             ax2.set_ylabel(L"{\rm IAG\ -\ GRASS}")
             ax1.legend()
@@ -392,6 +403,9 @@ function main()
         end
         comparison_plots()
     end
+
+    # write out optimized depth file
+    CSV.write(joinpath(data, "optimized_depth.csv"), df_dep)
     return nothing
 end
 
