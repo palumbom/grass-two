@@ -56,12 +56,15 @@ b4_array = zeros(number_levels)
 # set up array to hold correlation coeffs
 r_array = zeros(number_levels, Nloops)
 
+# get optimized depths
+df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
+
 # set up parameters for synthesis
 Nt = 160
 lines = [rest_wavelengths[template_idx]]
 templates = [template]
 blueshifts = zeros(length(lines))
-depths = [line_depths[template_idx]]
+depths = [df[template_idx, "optimized_depth"]]
 resolution = 7e5
 
 # synthesize the line

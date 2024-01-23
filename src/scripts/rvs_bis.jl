@@ -52,6 +52,9 @@ rest_wavelengths = GRASS.get_rest_wavelength(lp)
 line_depths = GRASS.get_depth(lp)
 line_names = GRASS.get_name(lp)
 
+# get optimized depths
+df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
+
 for (idx, file) in enumerate(lp.file)
     # if !contains(file, "TiII_5381")
     #     continue
@@ -66,7 +69,7 @@ for (idx, file) in enumerate(lp.file)
     # set up paramaters for spectrum
     Nt = 500
     lines = [rest_wavelengths[idx]]
-    depths = [line_depths[idx]]
+    depths = [df[i, "optimized_depth"]]
     templates = [file]
     variability = repeat([true], length(lines))
     blueshifts = zeros(length(lines))

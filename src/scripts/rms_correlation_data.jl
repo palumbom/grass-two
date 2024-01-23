@@ -61,6 +61,9 @@ corr_dict = Dict("bis_inv_slope"=>zeros(Nloops),
 # read in tuned BIS data
 bis_df = CSV.read(joinpath(data, "tuned_params.csv"), DataFrame)
 
+# get optimized depths
+df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
+
 # loop over lines
 for i in eachindex(lp.λrest)
     # print status
@@ -77,7 +80,7 @@ for i in eachindex(lp.λrest)
     Nt = round(Int, 60 * 40 / 15)
     lines = [λrest[i]]
     templates = [lfile[i]]
-    depths = [depth[i]]
+    depths = [df[i, "optimized_depth"]]
     blueshifts = zeros(length(lines))
     resolution = 7e5
 

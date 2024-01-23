@@ -1,5 +1,4 @@
 # environment + packages
-using Pkg; Pkg.activate(".")
 using CSV
 using CUDA
 using GRASS
@@ -27,386 +26,278 @@ if !isdir(plotdir)
 end
 
 # decide whether to use gpu
-use_gpu = CUDA.functional()
+use_gpu = true
+@assert CUDA.functional()
 
-# model the iag blends
-function model_iag_blends(wavs_sim::AbstractArray{T,1}, flux_sim::AbstractArray{T,1},
-                          wavs_iag::AbstractArray{T,1}, flux_iag::AbstractArray{T,1};
-                          plot=false) where T<:Float64
-    # calculate the residuals
-    resids = flux_sim .- flux_iag
+# get data
+lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
+files = GRASS.get_file(lp)
+line_names = GRASS.get_name(lp)
 
-    # models for fit
-    @. gaussian(x, a, b, c) = a * exp(-(x - b)^2/(2 * c^2)) + 1
-    function tel_model(x, p)
-        n = length(p) ÷ 3
-        out = ones(length(x))
-        for i in 1:n
-            out .*= gaussian(x, p[3i-2:3i]...)
-        end
-        return out .* flux_sim
+# read in optimized depths
+df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
+
+# wavelength of line to synthesize/compare to iag
+for (i, file) in enumerate(files)
+    if !contains(file, "5383")
+        continue
+    end
+    println(">>> Running " * line_names[i] * "...")
+
+    # i = 9
+    # file = line_names[i]
+
+    # get properties from line
+    line_name = line_names[i]
+    airwav = lp.λrest[i]
+    depth = lp.depth[i]
+
+    # get IAG spectrum and normalize it
+    wavs_iag0, flux_iag0 = GRASS.read_iag_atlas(isolate=true, airwav=airwav, buffer=1.5)
+    flux_iag0 ./= maximum(flux_iag0)
+
+    # convolve IAG spectrum to LARS resolution
+    wavs_iag, flux_iag = GRASS.convolve_gauss(wavs_iag0, flux_iag0, new_res=1e6, oversampling=4.0)
+
+   # get depth from IAG spectrum
+    buff = 0.12575
+    if contains("FeI_5383", line_name)
+        buff = 0.3
+    elseif contains("FeI_5434", line_name)
+        buff = 0.3
+    elseif contains("FeI_5382", line_name)
+        buff = 0.2
+    elseif contains("FeI_5576", line_name)
+        buff = 0.25
+    elseif contains("CaI_6169.0", line_name)
+        buff = 0.25
+    elseif contains("CaI_6169.5", line_name)
+        buff = 0.1475
+    elseif contains("FeI_6170", line_name)
+        buff = 0.175
+    elseif contains("FeI_6301", line_name)
+        buff = 0.25
+    elseif contains("FeI_6302", line_name)
+        buff = 0.15
     end
 
-    # identify peaks in the residuals
-    minresid = 0.001
-    w = 4
+    idxl = findfirst(x -> x .>= airwav - buff, wavs_iag)
+    idxr = findfirst(x -> x .>= airwav + buff, wavs_iag)
+    iag_bot = minimum(view(flux_iag, idxl:idxr))
+    iag_depth = 1.0 - iag_bot
 
-    # get the indices of maxima in resids
-    m_inds = Peaks.argmaxima(resids, w, strict=false)
+    # get the depth for the simulation
+    sim_depth = 0.8439837292977859
+    # sim_depth = df[i, "optimized_depth"]
 
-    # only keep ones above threshold
-    peak_resids = resids[m_inds]
-    m_inds = m_inds[(peak_resids) .>= minresid]
+    # simulate the spectrum
+    lines = [airwav]
+    depths = [sim_depth]
+    templates = [file]
+    resolution = 7e5
+    spec = SpecParams(lines=lines, depths=depths, templates=templates,
+                      resolution=resolution, buffer=1.5, oversampling=2.0)
+    disk = DiskParams(Nt=100)
 
-    # check that it's not empty
-    if isnothing(m_inds) | isempty(m_inds)
-        println("\t>>> No blends found above threshold....")
-        return flux_iag
+    # simulate the spectrum
+    wavs_sim, flux_sim = synthesize_spectra(spec, disk, use_gpu=use_gpu,
+                                            verbose=false, seed_rng=true)
+    flux_sim = dropdims(mean(flux_sim, dims=2), dims=2)
+
+    # interpolate iag on synth wavelength grid
+    itp = GRASS.linear_interp(wavs_iag, flux_iag, bc=NaN)
+    flux_iag = itp.(wavs_sim)
+    wavs_iag = copy(wavs_sim)
+
+    # get width in velocity for CCF
+    idxl_sim, idxr_sim = GRASS.find_wing_index(0.95, flux_sim)
+
+    # get width in angstroms
+    width_ang = wavs_sim[idxr_sim] - wavs_sim[idxl_sim]
+
+    # convert to velocity
+    width_vel = GRASS.c_ms * width_ang / wavs_sim[argmin(flux_sim)]
+    Δv_max = round((width_vel + 1e3)/100) * 100
+
+    # calculate ccfs for spectra
+    v_grid_iag, ccf_iag = GRASS.calc_ccf(wavs_iag, flux_iag, lines, depths,
+                                         7e5, Δv_step=100.0, Δv_max=Δv_max,
+                                         mask_type=EchelleCCFs.GaussianCCFMask)
+
+    v_grid_sim, ccf_sim = GRASS.calc_ccf(wavs_sim, flux_sim, lines, depths,
+                                         7e5, Δv_step=100.0, Δv_max=Δv_max,
+                                         mask_type=EchelleCCFs.GaussianCCFMask)
+
+    # plt.plot(wavs_iag, flux_iag)
+    # plt.plot(wavs_sim, flux_sim)
+    # plt.plot(v_grid_iag, ccf_iag)
+    # plt.plot(v_grid_sim, ccf_sim)
+    # plt.show()
+    # break
+
+    # get bisectors
+    vel_iag, int_iag = GRASS.calc_bisector(v_grid_iag, ccf_iag, nflux=50, top=0.9)
+    vel_sim, int_sim = GRASS.calc_bisector(v_grid_sim, ccf_sim, nflux=50, top=0.9)
+
+    # plt.plot(vel_iag, int_iag)
+    # plt.plot(vel_sim, int_sim)
+    # plt.show()
+
+    # compute velocity as mean bisector between N and M % depth
+    N = 0.20
+    M = 0.70
+    idx1 = findfirst(x -> x .>= N * iag_depth + iag_bot, int_iag)
+    idx2 = findfirst(x -> x .>= M * iag_depth + iag_bot, int_iag)
+    if isnothing(idx2)
+        idx2 = findfirst(x -> x .>= 0.9, int_iag)
     end
+    rv_iag = mean(view(vel_iag, idx1:idx2))
 
-    # get prominences, widths, and bounds
-    m_inds, m_proms = Peaks.peakproms(m_inds, resids, strict=false)
-    m_inds, m_widths, m_left, m_right = Peaks.peakwidths(m_inds, resids, m_proms, strict=false)
-
-    # do not model anything within atol of line core
-    idx = findall(x -> isapprox.(x, minimum(wavs_sim), atol=1e-2), wavs_iag[m_inds])
-    if !isnothing(idx)
-        m_inds = deleteat!(m_inds, idx)
-        m_widths = deleteat!(m_widths, idx)
-        m_left = deleteat!(m_left, idx)
-        m_right = deleteat!(m_right, idx)
+    idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim)
+    idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim)
+    if isnothing(idx2)
+        idx2 = findfirst(x -> x .>= 0.9, int_sim)
     end
+    rv_sim = mean(view(vel_sim, idx1:idx2))
 
-    # convert width from pixels to wavelength
-    m_widths .*= (wavs_iag[2] - wavs_iag[1])
+    # transform to lab frame
+    vel_iag .-= rv_iag
+    vel_sim .-= rv_sim
+    wavs_iag ./= calc_doppler_factor(rv_iag)
+    wavs_sim ./= calc_doppler_factor(rv_sim)
 
-    # set initial guess parameters
-    nfits = length(m_inds)
-    pgrid = zeros(nfits, 3)
-    p0 = Array{Float64,1}[]
-    for i in 1:nfits
-        thresh = abs(wavs_sim[argmin(flux_sim)] - wavs_iag[m_inds[i]])
-        if thresh <= 0.1
-            continue
-        end
-        pgrid[i,1] = -m_proms[i]
-        pgrid[i,2] = wavs_iag[m_inds[i]]
-        pgrid[i,3] = m_widths[i]
+    # interpolate IAG onto synthetic wavelength grid
+    itp = GRASS.linear_interp(wavs_iag, flux_iag)
+    flux_iag = itp.(wavs_sim)
+    wavs_iag = copy(wavs_sim)
+
+    # re-compute line isolation indices because of interpolation
+    idxl = findfirst(x -> x .>= airwav - buff, wavs_iag)
+    idxr = findfirst(x -> x .>= airwav + buff, wavs_iag)
+
+    # recompute bisectors b/c of interpolation
+    v_grid_iag, ccf_iag = GRASS.calc_ccf(wavs_iag, flux_iag, lines, depths,
+                                         7e5, Δv_step=100.0, Δv_max=Δv_max,
+                                         mask_type=EchelleCCFs.GaussianCCFMask)
+
+    v_grid_sim, ccf_sim = GRASS.calc_ccf(wavs_sim, flux_sim, lines, depths,
+                                         7e5, Δv_step=100.0, Δv_max=Δv_max,
+                                         mask_type=EchelleCCFs.GaussianCCFMask)
+
+    # set errant ccf values
+    idx0 = iszero.(ccf_iag)
+    idxnz = findfirst(x -> x .> 0.0, ccf_iag)
+    ccf_iag[idx0] .= ccf_iag[idxnz]
+
+    # get bisectors
+    vel_iag, int_iag = GRASS.calc_bisector(v_grid_iag, ccf_iag, nflux=50, top=0.9)
+    vel_sim, int_sim = GRASS.calc_bisector(v_grid_sim, ccf_sim, nflux=50, top=0.9)
+
+    # find mean velocities in order to align bisectors
+    N = 0.10
+    M = 0.70
+    idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim)
+    idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim)
+    if isnothing(idx2)
+        idx2 = findfirst(x -> x .>= 0.9, int_sim)
     end
-    p0 = Array{Float64,1}(vcat(p0, pgrid'...))
+    rv_sim = mean(view(vel_sim, idx1:idx2))
 
-    # do the fit
-    fit = curve_fit(tel_model, wavs_iag, flux_iag, p0)
-    resids .= flux_iag./(tel_model(wavs_iag, fit.param)./flux_sim) .- flux_sim
+    idx1 = findfirst(x -> x .>= N * iag_depth + iag_bot, int_iag)
+    idx2 = findfirst(x -> x .>= M * iag_depth + iag_bot, int_iag)
+    if isnothing(idx2)
+        idx2 = findfirst(x -> x .>= 0.9, int_iag)
+    end
+    rv_iag = mean(view(vel_iag, idx1:idx2))
 
-    # plot diagnostics
-    if plot
-        fig = plt.figure(figsize=(8,6))
+    # align the bisectors
+    vel_sim .-= rv_sim
+    vel_iag .-= rv_iag
+
+    # big function for plotting
+    function comparison_plots()
+        # make plot objects
+        fig = plt.figure(figsize=(6.4,4.8))
         gs = mpl.gridspec.GridSpec(nrows=2, ncols=1, height_ratios=[2, 1], figure=fig, hspace=0.05)
         ax1 = fig.add_subplot(gs[1])
         ax2 = fig.add_subplot(gs[2])
-        ax1.plot(wavs_iag, flux_iag, label="Observed IAG", color="tab:blue")
-        ax1.plot(wavs_iag, tel_model(wavs_iag, fit.param), label="Modeled IAG ", ls=":", color="tab:green")
-        for i in m_inds
-            thresh = abs(wavs_sim[argmin(flux_sim)] - wavs_iag[i])
-            if thresh <= 0.1
-                continue
-            end
-            ax1.axvline(wavs_sim[i])
-        end
-        ax2.scatter(wavs_sim, flux_iag./tel_model(wavs_iag, fit.param), c="k", s=0.5)
-        ax1.legend()
+
+        # plot spectra
+        ax1.plot(wavs_sim, flux_sim, marker="o", c="black", ms=3.0, lw=1.5, markevery=2, label=L"{\rm Synthetic}")
+        ax1.plot(wavs_iag, flux_iag, marker="s", c=colors[1], ms=2.0, lw=1.0, markevery=2, label=L"{\rm IAG}")
+        # ax1.plot(wavs_iag, flux_mod, alpha=0.9, marker="o", c=colors[2], ms=2.0, lw=1.0, markevery=2, label=L"{\rm Cleaned\ IAG}")
+
+        # plot resids
+        ax2.plot(wavs_sim, flux_iag .- flux_sim, c=colors[1], marker="s", ms=2.0, lw=0, markevery=2)
+        # ax2.plot(wavs_sim, flux_mod .- flux_sim, c=colors[2], marker="^", ms=2.0, lw=0, markevery=2)
+
+        # find limits
+        idx_min = argmin(flux_sim)
+        idx1 = idx_min - findfirst(x -> x .> 0.95, flux_sim[idx_min:-1:1])
+        idx2 = idx_min + findfirst(x -> x .> 0.95, flux_sim[idx_min:end])
+
+        # set limits
+        min_idx = argmin(flux_iag)
+        ax1.set_xlim(wavs_sim[idx1-50], wavs_sim[idx2+50])
+        ax1.set_ylim(minimum(flux_sim) - 0.1, 1.1)
+        ax2.set_xlim(wavs_sim[idx1-50], wavs_sim[idx2+50])
+        ax2.set_ylim(-0.0575, 0.0575)
+
+        # set tick labels, axis labels, etc.
         ax1.set_xticklabels([])
-        ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
+        ax1.set_ylabel(L"{\rm Normalized\ Flux}", labelpad=15)
         ax2.set_xlabel(L"{\rm Wavelength\ (\AA)}")
-        ax2.set_ylabel(L"{\rm IAG/Model}")
-        plt.show()
+        ax2.set_ylabel(L"{\rm IAG\ -\ GRASS}")
+        ax1.legend()
+        fig.tight_layout()
+
+        # set the title
+        title = replace(line_name, "_" => "\\ ")
+        idx = findfirst('I', title)
+        title = title[1:idx-1] * "\\ " * title[idx:end] * "\\ \\AA"
+        ax1.set_title(("\${\\rm " * title * "}\$"))
+
+        # save the plot
+        fig.subplots_adjust(wspace=0.05)
+        fig.savefig(joinpath(plotdir, line_name * "_line.pdf"))
         plt.clf(); plt.close()
+
+        # plot the bisectors
+        fig = plt.figure(figsize=(6.4,4.8))
+        gs = mpl.gridspec.GridSpec(nrows=1, ncols=2, width_ratios=[2, 1.1], figure=fig, wspace=0.05)
+        ax1 = fig.add_subplot(gs[1])
+        ax2 = fig.add_subplot(gs[2])
+
+        # plot bisectors
+        ax1.plot(vel_sim[4:end], int_sim[4:end], marker="o", color="black", ms=3.0, lw=2.0, markevery=1, label=L"{\rm Synthetic}")
+        ax1.plot(vel_iag[4:end], int_iag[4:end], marker="s", c=colors[1], ms=2.0, lw=1.0, markevery=1, label=L"{\rm IAG}")
+        # ax1.plot(vel_sim2, int_sim2, marker="o", color="black", ms=3.0, lw=2.0, markevery=1, label=L"{\rm Derp}")
+        # ax1.plot(vel_mod[2:end], int_mod[2:end], marker="^", c=colors[2], ms=2.0, lw=1.0, markevery=1, label=L"{\rm Cleaned\ IAG}")
+
+        # plot residuals
+        ax2.plot(vel_iag[4:end] .- vel_sim[4:end], int_iag[4:end], c=colors[1], marker="s", ms=2.0, lw=0.0, markevery=1)
+        # ax2.plot(vel_mod[2:end] .- vel_sim[2:end], int_mod[2:end], c=colors[2], marker="o", ms=2.0, lw=0.0, markevery=2)
+
+        # set tick labels, axis labels, etc.
+        ax2.set_yticklabels([])
+        ax2.yaxis.tick_right()
+        ax1.set_ylim(minimum(flux_sim) - 0.05, 1.05)
+        ax2.set_xlim(-35, 35)
+        ax2.set_ylim(minimum(flux_sim) - 0.05, 1.05)
+        ax1.set_xlabel(L"{\rm Relative\ Velocity\ (m\ s^{-1})}", fontsize=13)
+        ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
+        ax2.set_xlabel(L"{\rm IAG\ -\ GRASS\ (m\ s^{-1})}", fontsize=13)
+        ax1.legend(labelspacing=0.25)
+        # ax2.legend(loc="upper right", prop=Dict("size"=>12.5), labelspacing=0.25)
+
+        # set the title
+        fig.suptitle(("\${\\rm " * title * "}\$"), y=0.95)
+
+        # save the plot
+        fig.subplots_adjust(hspace=0.05)
+        fig.savefig(joinpath(plotdir, line_name * "_bisector.pdf"))
+        plt.clf(); plt.close()
+        return nothing
     end
-
-    return flux_iag./(tel_model(wavs_iag, fit.param)./flux_sim)
+    comparison_plots()
 end
-
-# figure 3 -- compare synthetic and IAG spectra + bisectors
-function main()
-    @assert CUDA.functional()
-
-    # get data
-    lp = GRASS.LineProperties(exclude=["CI_5380", "NaI_5896"])
-    files = GRASS.get_file(lp)
-    line_names = GRASS.get_name(lp)
-
-    # dataframe for optimized depth
-    df_dep = DataFrame("line" => line_names, "optimized_depth" => zeros(length(line_names)))
-
-    # wavelength of line to synthesize/compare to iag
-    for (i, file) in enumerate(files)
-        # if !contains(file, "FeI_5250.6")
-        #     continue
-        # end
-        println(">>> Running " * line_names[i] * "...")
-
-        # get properties from line
-        line_name = line_names[i]
-        airwav = lp.λrest[i]
-        depth = lp.depth[i]
-
-        # get IAG spectrum and normalize it
-        wavs_iag0, flux_iag0 = GRASS.read_iag_atlas(isolate=true, airwav=airwav, buffer=1.5)
-        flux_iag0 ./= maximum(flux_iag0)
-
-        # convolve IAG spectrum to LARS resolution
-        wavs_iag, flux_iag = GRASS.convolve_gauss(wavs_iag0, flux_iag0, new_res=7e5, oversampling=4.0)
-
-        # get depth from IAG spectrum
-        idxl = findfirst(x -> x .>= airwav - 0.125, wavs_iag)
-        idxr = findfirst(x -> x .>= airwav + 0.125, wavs_iag)
-        iag_bot = minimum(view(flux_iag, idxl:idxr))
-        iag_depth = 1.0 - iag_bot
-
-        # get wing indices
-        botind = argmin(view(flux_iag, idxl:idxr)) + idxl
-        idxl, idxr = GRASS.find_wing_index(0.9, flux_iag, min=botind)
-
-        # set up for GRASS spectrum simulation
-        function depth_diff(x)
-            # set up params from spectrum
-            lines = [airwav]
-            depths = x
-            templates = [file]
-            resolution = 7e5
-            disk = DiskParams(Nt=5)
-            spec = SpecParams(lines=lines, depths=depths, templates=templates, resolution=resolution)
-
-            # simulate the spectrum
-            wavs_sim, flux_sim = synthesize_spectra(spec, disk, use_gpu=use_gpu,
-                                                    verbose=false, seed_rng=true)
-            flux_sim = dropdims(mean(flux_sim, dims=2), dims=2)
-            return abs((1.0 - minimum(flux_sim)) - iag_depth)
-        end
-
-        # get the depth for the simulation
-        println("\t>>> Calculating optimized depth for line synthesis...")
-        lb = [0.0]
-        ub = [1.0]
-        optimizer = Fminbox(GradientDescent())
-        options = Optim.Options(f_abstol=1e-3, outer_f_abstol=1e-3, iterations=50, outer_iterations=50)
-        results = optimize(depth_diff, lb, ub, [iag_depth], optimizer, options)
-        sim_depth = results.minimizer[1]
-        df_dep[i, "optimized_depth"] = sim_depth
-        println("\t>>> Optimized depth = " * string(sim_depth))
-
-        # simulate the spectrum
-        lines = [airwav]
-        depths = [sim_depth]
-        templates = [file]
-        resolution = 7e5
-        spec = SpecParams(lines=lines, depths=depths, templates=templates,
-                          resolution=resolution, buffer=1.5, oversampling=2.0)
-        disk = DiskParams(Nt=100)
-
-        # simulate the spectrum
-        wavs_sim, flux_sim = synthesize_spectra(spec, disk, use_gpu=use_gpu,
-                                                verbose=false, seed_rng=true)
-        flux_sim = dropdims(mean(flux_sim, dims=2), dims=2)
-
-        # calculate ccfs for spectra
-        v_grid, ccf_iag = GRASS.calc_ccf(wavs_iag,#view(wavs_iag, idxl:idxr),
-                                         flux_iag,#view(flux_iag, idxl:idxr),
-                                         lines, depths,
-                                         7e5, Δv_step=100.0, Δv_max=15e3,
-                                         mask_type=EchelleCCFs.GaussianCCFMask)
-
-        v_grid, ccf_sim = GRASS.calc_ccf(wavs_sim, flux_sim, lines, depths,
-                                         7e5, Δv_step=100.0, Δv_max=15e3,
-                                         mask_type=EchelleCCFs.GaussianCCFMask)
-
-        # get bisectors
-        vel_iag, int_iag = GRASS.calc_bisector(v_grid, ccf_iag, nflux=50, top=0.9)
-        vel_sim, int_sim = GRASS.calc_bisector(v_grid, ccf_sim, nflux=50, top=0.9)
-
-        # compute velocity as mean bisector between N and M % depth
-        N = 0.1
-        M = 0.75
-        idx1 = findfirst(x -> x .>= N * iag_depth + iag_bot, int_iag)
-        idx2 = findfirst(x -> x .>= M * iag_depth + iag_bot, int_iag)
-        if isnothing(idx2)
-            idx2 = findfirst(x -> x .>= 0.9, int_iag)
-        end
-        rv_iag = mean(view(vel_iag, idx1:idx2))
-
-        idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim)
-        idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim)
-        if isnothing(idx2)
-            idx2 = findfirst(x -> x .>= 0.9, int_sim)
-        end
-        rv_sim = mean(view(vel_sim, idx1:idx2))
-
-        # transform to lab frame
-        vel_iag .-= rv_iag
-        vel_sim .-= rv_sim
-        wavs_iag ./= calc_doppler_factor(rv_iag)
-        wavs_sim ./= calc_doppler_factor(rv_sim)
-
-        # interpolate IAG onto synthetic wavelength grid
-        itp = GRASS.linear_interp(wavs_iag, flux_iag)
-        flux_iag = itp.(wavs_sim)
-        wavs_iag = copy(wavs_sim)
-
-        # re-compute line isolation indices because of interpolation
-        idxl = findfirst(x -> x .>= airwav - 0.125, wavs_iag)
-        idxr = findfirst(x -> x .>= airwav + 0.125, wavs_iag)
-
-        # get wing indices
-        botind = argmin(view(flux_iag, idxl:idxr)) + idxl
-        idxl, idxr = GRASS.find_wing_index(0.9, flux_iag, min=botind)
-
-        # clean the IAG spectrum
-        # flux_mod = model_iag_blends(wavs_sim, flux_sim, wavs_iag, flux_iag, plot=false)
-        # mod_depth = 1.0 - minimum(flux_mod)
-
-        # recompute bisectors b/c of interpolation
-        v_grid, ccf_iag = GRASS.calc_ccf(wavs_iag,#view(wavs_iag, idxl:idxr),
-                                         flux_iag,#view(flux_iag, idxl:idxr),
-                                         lines, depths,
-                                         7e5, Δv_step=100.0, Δv_max=15e3,
-                                         mask_type=EchelleCCFs.GaussianCCFMask)
-
-        v_grid, ccf_sim = GRASS.calc_ccf(wavs_sim, flux_sim, lines, depths,
-                                         7e5, Δv_step=100.0, Δv_max=15e3,
-                                         mask_type=EchelleCCFs.GaussianCCFMask)
-        vel_iag, int_iag = GRASS.calc_bisector(v_grid, ccf_iag, nflux=50, top=0.9)
-        vel_sim, int_sim = GRASS.calc_bisector(v_grid, ccf_sim, nflux=50, top=0.9)
-
-        # find mean velocities in order to align bisectors
-        N = 0.10
-        M = 0.70
-        idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim)
-        idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim)
-        if isnothing(idx2)
-            idx2 = findfirst(x -> x .>= 0.9, int_sim)
-        end
-        rv_sim = mean(view(vel_sim, idx1:idx2))
-
-        idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim2)
-        idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim2)
-        if isnothing(idx2)
-            idx2 = findfirst(x -> x .>= 0.9, int_sim2)
-        end
-        rv_sim2 = mean(view(vel_sim2, idx1:idx2))
-
-        idx1 = findfirst(x -> x .>= N * iag_depth + iag_bot, int_iag)
-        idx2 = findfirst(x -> x .>= M * iag_depth + iag_bot, int_iag)
-        if isnothing(idx2)
-            idx2 = findfirst(x -> x .>= 0.9, int_iag)
-        end
-        rv_iag = mean(view(vel_iag, idx1:idx2))
-
-        # idx1 = findfirst(x -> x .>= N * mod_depth + minimum(flux_mod), int_mod)
-        # idx2 = findfirst(x -> x .>= M * mod_depth + minimum(flux_mod), int_mod)
-        # if isnothing(idx2)
-        #     idx2 = findfirst(x -> x .>= 0.9, int_mod)
-        # end
-        # # rv_mod = mean(view(vel_mod, idx1:idx2))
-        # rv_mod = mean(vel_mod[idx1:idx2])
-
-        # align the bisectors
-        vel_sim .-= rv_sim
-        vel_sim2 .-= rv_sim2
-        vel_iag .-= rv_iag
-        # vel_mod .-= rv_mod
-
-        # big function for plotting
-        function comparison_plots()
-            # make plot objects
-            fig = plt.figure(figsize=(6.4,4.8))
-            gs = mpl.gridspec.GridSpec(nrows=2, ncols=1, height_ratios=[2, 1], figure=fig, hspace=0.05)
-            ax1 = fig.add_subplot(gs[1])
-            ax2 = fig.add_subplot(gs[2])
-
-            # plot spectra
-            ax1.plot(wavs_sim, flux_sim, marker="o", c="black", ms=3.0, lw=1.5, markevery=2, label=L"{\rm Synthetic}")
-            ax1.plot(wavs_iag, flux_iag, marker="s", c=colors[1], ms=2.0, lw=1.0, markevery=2, label=L"{\rm IAG}")
-            # ax1.plot(wavs_iag, flux_mod, alpha=0.9, marker="o", c=colors[2], ms=2.0, lw=1.0, markevery=2, label=L"{\rm Cleaned\ IAG}")
-
-            # plot resids
-            ax2.plot(wavs_sim, flux_iag .- flux_sim, c=colors[1], marker="s", ms=2.0, lw=0, markevery=2)
-            # ax2.plot(wavs_sim, flux_mod .- flux_sim, c=colors[2], marker="^", ms=2.0, lw=0, markevery=2)
-
-            # find limits
-            idx_min = argmin(flux_sim)
-            idx1 = idx_min - findfirst(x -> x .> 0.95, flux_sim[idx_min:-1:1])
-            idx2 = idx_min + findfirst(x -> x .> 0.95, flux_sim[idx_min:end])
-
-            # set limits
-            min_idx = argmin(flux_iag)
-            ax1.set_xlim(wavs_sim[idx1-50], wavs_sim[idx2+50])
-            ax1.set_ylim(minimum(flux_sim) - 0.1, 1.1)
-            ax2.set_xlim(wavs_sim[idx1-50], wavs_sim[idx2+50])
-            ax2.set_ylim(-0.125, 0.125)
-
-            # set tick labels, axis labels, etc.
-            ax1.set_xticklabels([])
-            ax1.set_ylabel(L"{\rm Normalized\ Flux}", labelpad=15)
-            ax2.set_xlabel(L"{\rm Wavelength\ (\AA)}")
-            ax2.set_ylabel(L"{\rm IAG\ -\ GRASS}")
-            ax1.legend()
-            fig.tight_layout()
-
-            # set the title
-            title = replace(line_name, "_" => "\\ ")
-            idx = findfirst('I', title)
-            title = title[1:idx-1] * "\\ " * title[idx:end] * "\\ \\AA"
-            ax1.set_title(("\${\\rm " * title * "}\$"))
-
-            # save the plot
-            fig.subplots_adjust(wspace=0.05)
-            fig.savefig(joinpath(plotdir, line_name * "_line.pdf"))
-            plt.clf(); plt.close()
-
-            # plot the bisectors
-            fig = plt.figure(figsize=(6.4,4.8))
-            gs = mpl.gridspec.GridSpec(nrows=1, ncols=2, width_ratios=[2, 1.1], figure=fig, wspace=0.05)
-            ax1 = fig.add_subplot(gs[1])
-            ax2 = fig.add_subplot(gs[2])
-
-            # plot bisectors
-            ax1.plot(vel_sim[4:end], int_sim[4:end], marker="o", color="black", ms=3.0, lw=2.0, markevery=1, label=L"{\rm Synthetic}")
-            ax1.plot(vel_iag[4:end], int_iag[4:end], marker="s", c=colors[1], ms=2.0, lw=1.0, markevery=1, label=L"{\rm IAG}")
-            # ax1.plot(vel_sim2, int_sim2, marker="o", color="black", ms=3.0, lw=2.0, markevery=1, label=L"{\rm Derp}")
-            # ax1.plot(vel_mod[2:end], int_mod[2:end], marker="^", c=colors[2], ms=2.0, lw=1.0, markevery=1, label=L"{\rm Cleaned\ IAG}")
-
-            # plot residuals
-            ax2.plot(vel_iag[4:end] .- vel_sim[4:end], int_iag[4:end], c=colors[1], marker="s", ms=2.0, lw=0.0, markevery=1)
-            # ax2.plot(vel_mod[2:end] .- vel_sim[2:end], int_mod[2:end], c=colors[2], marker="o", ms=2.0, lw=0.0, markevery=2)
-
-            # set tick labels, axis labels, etc.
-            ax2.set_yticklabels([])
-            ax2.yaxis.tick_right()
-            ax1.set_ylim(minimum(flux_sim) - 0.05, 1.05)
-            ax2.set_xlim(-35, 35)
-            ax2.set_ylim(minimum(flux_sim) - 0.05, 1.05)
-            ax1.set_xlabel(L"{\rm Relative\ Velocity\ (m\ s^{-1})}", fontsize=13)
-            ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
-            ax2.set_xlabel(L"{\rm IAG\ -\ GRASS\ (m\ s^{-1})}", fontsize=13)
-            ax1.legend(labelspacing=0.25)
-            # ax2.legend(loc="upper right", prop=Dict("size"=>12.5), labelspacing=0.25)
-
-            # set the title
-            fig.suptitle(("\${\\rm " * title * "}\$"), y=0.95)
-
-            # save the plot
-            fig.subplots_adjust(hspace=0.05)
-            fig.savefig(joinpath(plotdir, line_name * "_bisector.pdf"))
-            plt.clf(); plt.close()
-            return nothing
-        end
-        comparison_plots()
-    end
-
-    # write out optimized depth file
-    CSV.write(joinpath(data, "optimized_depth.csv"), df_dep)
-    return nothing
-end
-
-main()

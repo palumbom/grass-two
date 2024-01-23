@@ -35,13 +35,17 @@ line_names = GRASS.get_name(lp)
 line_titles = replace.(line_names, "_" => " ")
 line_files = GRASS.get_file(lp)
 
+# get optimized depths
+df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
+opt_dep = df[idx, "optimized_depth"]
+
 # get index of line template I want
 idx = findfirst(x -> contains(x, template), line_names)
 
 # parameters for spectrum
 nlines = 500
 lines = collect(range(4500, 6500, length=nlines)) .+ 0.1 .* rand(nlines)
-depths = repeat([line_depths[idx]], nlines)
+depths = repeat([opt_dep], nlines)
 blueshifts = zeros(nlines)
 templates = repeat([line_files[idx]], nlines)
 
