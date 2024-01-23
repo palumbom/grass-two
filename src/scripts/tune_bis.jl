@@ -42,7 +42,7 @@ line_titles = replace.(line_names, "_" => " ")
 line_files = GRASS.get_file(lp)
 
 # set number of loops
-Nloops = 32
+Nloops = 50
 
 # set number of levels tried
 number_levels = 500

@@ -24,6 +24,7 @@ colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 include(joinpath(abspath(@__DIR__), "paths.jl"))
 # include("paths.jl")
 plotdir = string(figures)
+datadir = string(data)
 datafile = string(abspath(joinpath(data, "rms_table.csv")))
 
 # get lines to construct templates
@@ -62,7 +63,7 @@ corr_dict = Dict("bis_inv_slope"=>zeros(Nloops),
 bis_df = CSV.read(joinpath(data, "tuned_params.csv"), DataFrame)
 
 # get optimized depths
-df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
+df_dep = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
 
 # loop over lines
 for i in eachindex(lp.λrest)
@@ -80,7 +81,7 @@ for i in eachindex(lp.λrest)
     Nt = round(Int, 60 * 40 / 15)
     lines = [λrest[i]]
     templates = [lfile[i]]
-    depths = [df[i, "optimized_depth"]]
+    depths = [df_dep[i, "optimized_depth"]]
     blueshifts = zeros(length(lines))
     resolution = 7e5
 

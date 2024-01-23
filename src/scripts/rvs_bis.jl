@@ -69,7 +69,7 @@ for (idx, file) in enumerate(lp.file)
     # set up paramaters for spectrum
     Nt = 500
     lines = [rest_wavelengths[idx]]
-    depths = [df[i, "optimized_depth"]]
+    depths = [df[idx, "optimized_depth"]]
     templates = [file]
     variability = repeat([true], length(lines))
     blueshifts = zeros(length(lines))

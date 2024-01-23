@@ -24,6 +24,7 @@ println(">>> Template = " * template)
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
+datadir = string(abspath(data))
 datafile = string(abspath(joinpath(data, template * "_picket_fence.jld2")))
 
 # get input data properties
@@ -37,17 +38,14 @@ line_files = GRASS.get_file(lp)
 
 # get optimized depths
 df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
-opt_dep = df[idx, "optimized_depth"]
-
-# get index of line template I want
-idx = findfirst(x -> contains(x, template), line_names)
+opt_dep = df[template_idx, "optimized_depth"]
 
 # parameters for spectrum
 nlines = 500
 lines = collect(range(4500, 6500, length=nlines)) .+ 0.1 .* rand(nlines)
 depths = repeat([opt_dep], nlines)
 blueshifts = zeros(nlines)
-templates = repeat([line_files[idx]], nlines)
+templates = repeat([template], nlines)
 
 # synthesize the spectra
 Nt = 1000

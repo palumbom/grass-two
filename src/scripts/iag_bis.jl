@@ -39,13 +39,10 @@ df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
 
 # wavelength of line to synthesize/compare to iag
 for (i, file) in enumerate(files)
-    if !contains(file, "5383")
+    if !contains(file, "FeI_6301")
         continue
     end
     println(">>> Running " * line_names[i] * "...")
-
-    # i = 9
-    # file = line_names[i]
 
     # get properties from line
     line_name = line_names[i]
@@ -78,7 +75,7 @@ for (i, file) in enumerate(files)
     elseif contains("FeI_6301", line_name)
         buff = 0.25
     elseif contains("FeI_6302", line_name)
-        buff = 0.15
+        buff = 0.125
     end
 
     idxl = findfirst(x -> x .>= airwav - buff, wavs_iag)
@@ -87,8 +84,7 @@ for (i, file) in enumerate(files)
     iag_depth = 1.0 - iag_bot
 
     # get the depth for the simulation
-    sim_depth = 0.8439837292977859
-    # sim_depth = df[i, "optimized_depth"]
+    sim_depth = df[i, "optimized_depth"]
 
     # simulate the spectrum
     lines = [airwav]
