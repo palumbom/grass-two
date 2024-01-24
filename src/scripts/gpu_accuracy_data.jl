@@ -47,14 +47,14 @@ resids64 = flux_cpu64 .- flux_gpu64
 resids32 = flux_cpu64 .- flux_gpu32
 
 # compute velocities
-v_grid, ccf1 = calc_ccf(wavs_cpu64, flux_cpu64, spec, normalize=true, mask_type=EchelleCCFs.TopHatCCFMask)
-rvs_cpu64, sigs_cpu64 = calc_rvs_from_ccf(v_grid, ccf1)
+v_grid, ccf1 = calc_ccf(wavs_cpu64, flux_cpu64, spec, normalize=true, mask_type=EchelleCCFs.GaussianCCFMask)
+rvs_cpu64, sigs_cpu64 = calc_rvs_from_ccf(v_grid, ccf1, frac_of_width_to_fit=0.5)
 
-v_grid, ccf1 = calc_ccf(wavs_gpu64, flux_gpu64, spec, normalize=true, mask_type=EchelleCCFs.TopHatCCFMask)
-rvs_gpu64, sigs_gpu64 = calc_rvs_from_ccf(v_grid, ccf1)
+v_grid, ccf1 = calc_ccf(wavs_gpu64, flux_gpu64, spec, normalize=true, mask_type=EchelleCCFs.GaussianCCFMask)
+rvs_gpu64, sigs_gpu64 = calc_rvs_from_ccf(v_grid, ccf1, frac_of_width_to_fit=0.5)
 
-v_grid, ccf1 = calc_ccf(wavs_gpu32, flux_gpu32, spec, normalize=true, mask_type=EchelleCCFs.TopHatCCFMask)
-rvs_gpu32, sigs_gpu32 = calc_rvs_from_ccf(v_grid, ccf1)
+v_grid, ccf1 = calc_ccf(wavs_gpu32, flux_gpu32, spec, normalize=true, mask_type=EchelleCCFs.GaussianCCFMask)
+rvs_gpu32, sigs_gpu32 = calc_rvs_from_ccf(v_grid, ccf1, frac_of_width_to_fit=0.5)
 
 # get velocity residuals
 v_resid64 = rvs_cpu64 - rvs_gpu64
@@ -71,6 +71,7 @@ println()
 
 # write to disk
 jldsave(datafile, resids64=resids64, resids32=resids32,
+        v_resids64=v_resid64, v_resid32=v_resid32,
         wavs_cpu64=wavs_cpu64, flux_cpu64=flux_cpu64,
         wavs_gpu64=wavs_cpu64, flux_gpu64=flux_cpu64,
         wavs_gpu32=wavs_cpu64, flux_gpu32=flux_cpu64)
