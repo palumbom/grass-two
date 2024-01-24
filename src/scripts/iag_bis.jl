@@ -37,12 +37,17 @@ line_names = GRASS.get_name(lp)
 # read in optimized depths
 df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
 
+df_tuned = CSV.read(joinpath(datadir, "tuned_params.csv"), DataFrame)
+
 # wavelength of line to synthesize/compare to iag
 for (i, file) in enumerate(files)
-    if !contains(file, "FeI_6301")
-        continue
-    end
+    # if !contains(file, "FeI_5383")
+    #     continue
+    # end
     println(">>> Running " * line_names[i] * "...")
+
+    # i = 5
+    # file = line_names[i]
 
     # get properties from line
     line_name = line_names[i]
@@ -107,6 +112,9 @@ for (i, file) in enumerate(files)
 
     # get width in velocity for CCF
     idxl_sim, idxr_sim = GRASS.find_wing_index(0.95, flux_sim)
+    if contains("FeI_6302", line_name)
+        idxl_sim, idxr_sim = GRASS.find_wing_index(0.875, flux_sim)
+    end
 
     # get width in angstroms
     width_ang = wavs_sim[idxr_sim] - wavs_sim[idxl_sim]
@@ -116,6 +124,9 @@ for (i, file) in enumerate(files)
     Δv_max = round((width_vel + 1e3)/100) * 100
 
     # calculate ccfs for spectra
+    if contains("FeI_6302", line_name)
+        Δv_max -= 200
+    end
     v_grid_iag, ccf_iag = GRASS.calc_ccf(wavs_iag, flux_iag, lines, depths,
                                          7e5, Δv_step=100.0, Δv_max=Δv_max,
                                          mask_type=EchelleCCFs.GaussianCCFMask)
@@ -124,16 +135,26 @@ for (i, file) in enumerate(files)
                                          7e5, Δv_step=100.0, Δv_max=Δv_max,
                                          mask_type=EchelleCCFs.GaussianCCFMask)
 
+    # deal with annoying line blend
+    if contains("FeI_6302", line_name)
+        amin_ccf = argmin(ccf_iag)
+        idx_b = findfirst(x -> x .> 0.925, ccf_iag[amin_ccf:end]) + amin_ccf
+        ccf_iag = ccf_iag[1:idx_b]
+        v_grid_iag = v_grid_iag[1:idx_b]
+    end
+
     # plt.plot(wavs_iag, flux_iag)
     # plt.plot(wavs_sim, flux_sim)
+    # plt.axvline(v_grid_iag[idx_b])
     # plt.plot(v_grid_iag, ccf_iag)
     # plt.plot(v_grid_sim, ccf_sim)
     # plt.show()
     # break
 
     # get bisectors
-    vel_iag, int_iag = GRASS.calc_bisector(v_grid_iag, ccf_iag, nflux=50, top=0.9)
-    vel_sim, int_sim = GRASS.calc_bisector(v_grid_sim, ccf_sim, nflux=50, top=0.9)
+    top = 0.9
+    vel_iag, int_iag = GRASS.calc_bisector(v_grid_iag, ccf_iag, nflux=50, top=top)
+    vel_sim, int_sim = GRASS.calc_bisector(v_grid_sim, ccf_sim, nflux=50, top=top)
 
     # plt.plot(vel_iag, int_iag)
     # plt.plot(vel_sim, int_sim)
@@ -180,17 +201,24 @@ for (i, file) in enumerate(files)
                                          7e5, Δv_step=100.0, Δv_max=Δv_max,
                                          mask_type=EchelleCCFs.GaussianCCFMask)
 
-    # set errant ccf values
-    idx0 = iszero.(ccf_iag)
-    idxnz = findfirst(x -> x .> 0.0, ccf_iag)
-    ccf_iag[idx0] .= ccf_iag[idxnz]
+    if contains("FeI_6302", line_name)
+        amin_ccf = argmin(ccf_iag)
+        idx_b = findfirst(x -> x .> 0.925, ccf_iag[amin_ccf:end]) + amin_ccf
+        ccf_iag = ccf_iag[1:idx_b]
+        v_grid_iag = v_grid_iag[1:idx_b]
+    end
+
+    # # set errant ccf values
+    # idx0 = iszero.(ccf_iag)
+    # idxnz = findfirst(x -> x .> 0.0, ccf_iag)
+    # ccf_iag[idx0] .= ccf_iag[idxnz]
 
     # get bisectors
-    vel_iag, int_iag = GRASS.calc_bisector(v_grid_iag, ccf_iag, nflux=50, top=0.9)
-    vel_sim, int_sim = GRASS.calc_bisector(v_grid_sim, ccf_sim, nflux=50, top=0.9)
+    vel_iag, int_iag = GRASS.calc_bisector(v_grid_iag, ccf_iag, nflux=50, top=top)
+    vel_sim, int_sim = GRASS.calc_bisector(v_grid_sim, ccf_sim, nflux=50, top=top)
 
     # find mean velocities in order to align bisectors
-    N = 0.10
+    N = 0.20
     M = 0.70
     idx1 = findfirst(x -> x .>= N * sim_depth + minimum(flux_sim), int_sim)
     idx2 = findfirst(x -> x .>= M * sim_depth + minimum(flux_sim), int_sim)
@@ -209,6 +237,25 @@ for (i, file) in enumerate(files)
     # align the bisectors
     vel_sim .-= rv_sim
     vel_iag .-= rv_iag
+
+    # get the bisector residuals
+    bis_resids = vel_iag .- vel_sim
+    med_resids = median(bis_resids)
+
+    vel_sim .+= med_resids
+
+    # get the tuned fluxes for BIS
+    b1 = df_tuned[i, "b1"]
+    b2 = df_tuned[i, "b2"]
+    b3 = df_tuned[i, "b3"]
+    b4 = df_tuned[i, "b4"]
+
+    # convert to flux level
+    dep_sim = 1.0 - minimum(ccf_sim)
+    i1 = 1.0 - b1 * dep_sim
+    i2 = 1.0 - b2 * dep_sim
+    i3 = 1.0 - b3 * dep_sim
+    i4 = 1.0 - b4 * dep_sim
 
     # big function for plotting
     function comparison_plots()
@@ -269,6 +316,12 @@ for (i, file) in enumerate(files)
         ax1.plot(vel_iag[4:end], int_iag[4:end], marker="s", c=colors[1], ms=2.0, lw=1.0, markevery=1, label=L"{\rm IAG}")
         # ax1.plot(vel_sim2, int_sim2, marker="o", color="black", ms=3.0, lw=2.0, markevery=1, label=L"{\rm Derp}")
         # ax1.plot(vel_mod[2:end], int_mod[2:end], marker="^", c=colors[2], ms=2.0, lw=1.0, markevery=1, label=L"{\rm Cleaned\ IAG}")
+
+        # plot BIS levels
+        # ax1.axhline(i1, ls="--", c="k")
+        # ax1.axhline(i2, ls="--", c="k")
+        # ax1.axhline(i3, ls=":", c="k")
+        # ax1.axhline(i4, ls=":", c="k")
 
         # plot residuals
         ax2.plot(vel_iag[4:end] .- vel_sim[4:end], int_iag[4:end], c=colors[1], marker="s", ms=2.0, lw=0.0, markevery=1)

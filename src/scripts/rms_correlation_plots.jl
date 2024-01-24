@@ -23,6 +23,7 @@ colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 # get command line args and output directories
 include("paths.jl")#joinpath(abspath(@__DIR__), "paths.jl"))
 plotdir = string(figures)
+datadir = string(abspath(data))
 datafile = string(abspath(joinpath(data, "rms_table.csv")))
 
 # get lines to construct templates
@@ -98,10 +99,13 @@ for i in eachindex(name)
     push!(xticklabels, title)
 end
 
+capsize = 5
+
+# RMS ladder
 fig, ax1 = plt.subplots(figsize=(9.2,4.8))
 
-ax1.errorbar(xdata, ydata[idx], yerr=yerrs[idx], linestyle="none", c="k", capsize=0.5, zorder=0)
-ax1.scatter(xdata, ydata[idx], marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap)
+ax1.errorbar(xdata, ydata[idx], yerr=yerrs[idx], linestyle="none", c="tab:blue", capsize=capsize, zorder=0, alpha=0.9)
+ax1.scatter(xdata, ydata[idx], marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap, edgecolors="k", s=45)
 
 cbar = fig.colorbar(smap, ax=ax1)
 # cbar.ax.tick_params(labelsize=11)
@@ -117,12 +121,55 @@ fig.tight_layout()
 fig.savefig(joinpath(plotdir, "rms_ladder.pdf"), bbox_inches="tight")
 plt.clf(); plt.close()
 
+# get improved RMS
+df_improved = CSV.read(joinpath(data, "rms_table.csv"), DataFrame)
+ydata_imp = df.bis_tuned_rms
+yerrs_imp = df.bis_tuned_sig
+
+xdata = collect(xdata)
+xdata .*= 2.0
+
+# RMS ladder with improvements
+fig, ax1 = plt.subplots(figsize=(9.2,4.8))
+
+ax1.errorbar(xdata, ydata[idx], yerr=yerrs[idx], linestyle="none", c="k", capsize=capsize, zorder=0)
+ax1.scatter(xdata, ydata[idx], marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap, edgecolors="k", s=45)
+
+ax1.errorbar(xdata, ydata_imp[idx], yerr=yerrs_imp[idx], linestyle="none", c="tab:blue", capsize=capsize, zorder=0, alpha=0.9)
+ax1.scatter(xdata, ydata_imp[idx], marker="d", c=dat, zorder=1, norm=cnorm, cmap=cmap, edgecolors="k", s=45)
+
+
+cbar = fig.colorbar(smap, ax=ax1)
+# cbar.ax.tick_params(labelsize=11)
+cbar.ax.set_ylabel(L"{\rm T}_{1/2}\ {\rm (K)}")
+
+ax1.set_ylabel(L"{\rm RV\ RMS\ (m\ s}^{-1}{\rm )}")
+
+xticks = xdata .+ 0.25
+ax1.set_xticks(xticks)
+ax1.set_xticklabels(xticklabels[idx], rotation=90)
+ax1.grid(false)
+
+fig.tight_layout()
+fig.savefig(joinpath(plotdir, "rms_ladder_improved.pdf"), bbox_inches="tight")
+
+plt.clf(); plt.close()
+
+@show maximum(ydata) - minimum(ydata)
+@show maximum(ydata)
+@show minimum(ydata)
+
+@show maximum(ydata_imp) - minimum(ydata_imp)
+@show maximum(ydata_imp)
+@show minimum(ydata_imp)
+
+
 # plot rms vs temp
 # fig, axs = plt.subplots(figsize=(12.4,4.8), ncols=3, nrows=1, sharey=true)
 fig, ax1 = plt.subplots()
 # ax1, ax2, ax3 = axs
 
-ax1.errorbar(df.avg_temp_50, df.raw_rms, yerr=df.raw_rms_sig, linestyle="none", c="k", capsize=0.5, zorder=0)
+ax1.errorbar(df.avg_temp_50, df.raw_rms, yerr=df.raw_rms_sig, linestyle="none", c="k", capsize=capsize, zorder=0)
 ax1.scatter(df.avg_temp_50, df.raw_rms, marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap)
 
 # ax1.set_xlim(minimum(df.avg_temp_50), maximum(df.avg_temp_50))

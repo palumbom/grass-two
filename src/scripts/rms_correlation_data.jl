@@ -41,23 +41,26 @@ df = DataFrame(line=name, raw_rms=zeros(length(name)), raw_rms_sig=zeros(length(
                bis_inv_slope_corr=zeros(length(name)), bis_inv_slope_rms=zeros(length(name)), bis_inv_slope_sig=zeros(length(name)),
                bis_span_corr=zeros(length(name)), bis_span_rms=zeros(length(name)), bis_span_sig=zeros(length(name)),
                bis_curve_corr=zeros(length(name)), bis_curve_rms=zeros(length(name)), bis_curve_sig=zeros(length(name)),
-               bis_tuned_corr=zeros(length(name)), bis_tuned_rms=zeros(length(name)), bis_tuned_sig=zeros(length(name)))
+               bis_tuned_corr=zeros(length(name)), bis_tuned_rms=zeros(length(name)), bis_tuned_sig=zeros(length(name)),
+               curved_tuned_corr=zeros(length(name)), curved_tuned_rms=zeros(length(name)), curved_tuned_sig=zeros(length(name)))
 
-holder_names = ["bis_inv_slope", "bis_span", "bis_curve", "bis_tuned"]
+holder_names = ["bis_inv_slope", "bis_span", "bis_curve", "bis_tuned", "curve_tuned"]
 
 # set number of loops
-Nloops = 200
+Nloops = 500
 
 raw_rms = zeros(Nloops)
 rms_dict = Dict("bis_inv_slope"=>zeros(Nloops),
                 "bis_span"=>zeros(Nloops),
                 "bis_curve"=>zeros(Nloops),
-                "bis_tuned"=>zeros(Nloops))
+                "bis_tuned"=>zeros(Nloops),
+                "curve_tuned"=>zeros(Nloops))
 
 corr_dict = Dict("bis_inv_slope"=>zeros(Nloops),
                  "bis_span"=>zeros(Nloops),
                  "bis_curve"=>zeros(Nloops),
-                 "bis_tuned"=>zeros(Nloops))
+                 "bis_tuned"=>zeros(Nloops),
+                 "curve_tuned"=>zeros(Nloops))
 
 # read in tuned BIS data
 bis_df = CSV.read(joinpath(data, "tuned_params.csv"), DataFrame)
@@ -76,6 +79,14 @@ for i in eachindex(lp.λrest)
     b2 = bis_df[bis_params_idx, "b2"]
     b3 = bis_df[bis_params_idx, "b3"]
     b4 = bis_df[bis_params_idx, "b4"]
+
+    # get the tuned bisector curvature levels
+    c1 = bis_df[bis_params_idx, "c1"]
+    c2 = bis_df[bis_params_idx, "c2"]
+    c3 = bis_df[bis_params_idx, "c3"]
+    c4 = bis_df[bis_params_idx, "c4"]
+    c5 = bis_df[bis_params_idx, "c5"]
+    c6 = bis_df[bis_params_idx, "c6"]
 
     # set up spec
     Nt = round(Int, 60 * 40 / 15)
@@ -126,19 +137,20 @@ for i in eachindex(lp.λrest)
         # synthesize the line
         wavs, flux = synthesize_spectra(spec, disk, verbose=false, use_gpu=true)
 
-        # measure bisector
-        bis, int = GRASS.calc_bisector(wavs, flux, nflux=100, top=0.99)
-
-        # convert bis to velocity scale
-        for i in 1:Nt
-            bis[:, i] = (bis[:,i] .- lines[1]) * GRASS.c_ms / lines[1]
-        end
-
         # measure velocities
         GRASS.calc_ccf!(v_grid, projection, proj_flux, ccf, wavs, flux, lines,
                         depths, resolution, Δv_step=Δv_step, Δv_max=Δv_max,
                         mask_type=EchelleCCFs.GaussianCCFMask)
         rvs, sigs = calc_rvs_from_ccf(v_grid, ccf, frac_of_width_to_fit=0.5)
+
+        # measure bisector
+        # bis, int = GRASS.calc_bisector(wavs, flux, nflux=100, top=0.99)
+        # for i in 1:Nt
+        #     bis[:, i] = (bis[:,i] .- lines[1]) * GRASS.c_ms / lines[1]
+        # end
+
+        # measure bisector
+        bis, int = GRASS.calc_bisector(v_grid, ccf, nflux=100, top=0.99)
 
         # set the rms in the table
         raw_rms[k] = calc_rms(rvs)
@@ -148,9 +160,10 @@ for i in eachindex(lp.λrest)
         bis_span = GRASS.calc_bisector_span(bis, int)
         bis_curve = GRASS.calc_bisector_curvature(bis, int)
         bis_inv_slope_tuned = GRASS.calc_bisector_inverse_slope(bis, int, b1=b1, b2=b2, b3=b3, b4=b4)
+        bis_curvature_tuned = GRASS.calc_bisector_inverse_slope(bis, int, c1=c1, c2=c2, c3=c3, c4=c4, c5=c5, c6=c6)
 
         # set up holder for summary statistis and loop over it
-        holder = [bis_inv_slope, bis_span, bis_curve, bis_inv_slope_tuned]
+        holder = [bis_inv_slope, bis_span, bis_curve, bis_inv_slope_tuned, bis_curvature_tuned]
 
         for j in eachindex(holder_names)
             # data to fit
@@ -171,11 +184,11 @@ for i in eachindex(lp.λrest)
     end
 
     # take the average
-    df[i, "raw_rms"] = mean(raw_rms)
+    df[i, "raw_rms"] = median(raw_rms)
     df[i, "raw_rms_sig"] = std(raw_rms)
     for j in eachindex(holder_names)
         # assign rms
-        df[i, holder_names[j]*"_rms"] = mean(rms_dict[holder_names[j]])
+        df[i, holder_names[j]*"_rms"] = median(rms_dict[holder_names[j]])
         df[i, holder_names[j]*"_sig"] = std(rms_dict[holder_names[j]])
         df[i, holder_names[j]*"_corr"] = mean(corr_dict[holder_names[j]])
     end
