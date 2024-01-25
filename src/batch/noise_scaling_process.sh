@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -A dfc13_mri
 #SBATCH -p mgc-mri
-#SBATCH --array=1-22
+#SBATCH --array=1-11
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
 #SBATCH --ntasks=8

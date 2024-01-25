@@ -1,8 +1,10 @@
+using CSV
 using CUDA
 using GRASS
 using Printf
 using Revise
 using PyCall
+using DataFrames
 using Statistics
 using EchelleCCFs
 using Polynomials
@@ -17,6 +19,7 @@ mpl.style.use(GRASS.moddir * "fig.mplstyle")
 colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 include(joinpath(abspath(@__DIR__), "paths.jl"))
+datadir = abspath(string(data))
 outdir = abspath(string(figures))
 if !isdir(outdir)
     mkdir(outdir)
@@ -56,9 +59,9 @@ line_names = GRASS.get_name(lp)
 df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
 
 for (idx, file) in enumerate(lp.file)
-    # if !contains(file, "TiII_5381")
-    #     continue
-    # end
+    if !contains(file, "TiII_5381")
+        continue
+    end
 
     # get line title
     title = replace(line_names[idx], "_" => "\\ ")
@@ -144,14 +147,14 @@ for (idx, file) in enumerate(lp.file)
     int = GRASS.moving_average(int, 4)
 
     # mean subtract the bisector plotting (remove bottommost and topmost measurements)
-    idx_start = 4
-    idx_d_end = 1
+    idx_start = 1#4
+    idx_d_end = 0#1
     mean_bis = dropdims(mean(bis, dims=2), dims=2)[idx_start:end-idx_d_end]
     mean_int = dropdims(mean(int, dims=2), dims=2)[idx_start:end-idx_d_end]
     bis .-= mean(mean_bis)
 
     # plot the variability in bisector on exaggerated scale
-    for i in 1:20
+    for i in 1:2:200
         bis_i = view(bis, :, i)[idx_start:end-idx_d_end]
         int_i = view(int, :, i)[idx_start:end-idx_d_end]
 

@@ -46,9 +46,9 @@ df["bis_curve_impr"] = (np.round(100 * (df["raw_rms"] - df["bis_curve_rms"]) / d
 
 # make table with decorrelation and correlation coefficietns
 df.to_latex(buf=tabfile2, na_rep="-", columns=["line", 'bis_inv_slope_corr',
-       'bis_inv_slope_rms', 'bis_inv_slope_sig', 'bis_inv_slope_impr', 'bis_span_corr',
-       'bis_span_rms', 'bis_span_sig', 'bis_span_impr', 'bis_curve_corr', 'bis_curve_rms',
-       'bis_curve_sig', 'bis_curve_impr'], index=False)
+            'bis_inv_slope_rms', 'bis_inv_slope_sig', 'bis_inv_slope_impr', 'bis_span_corr',
+            'bis_span_rms', 'bis_span_sig', 'bis_span_impr', 'bis_curve_corr', 'bis_curve_rms',
+            'bis_curve_sig', 'bis_curve_impr'], index=False)
 
 # pdb.set_trace()
 
@@ -78,6 +78,11 @@ df_tuned["b1"] = (df_tuned["b1"]).astype(int)
 df_tuned["b2"] = (df_tuned["b2"]).astype(int)
 df_tuned["b3"] = (df_tuned["b3"]).astype(int)
 df_tuned["b4"] = (df_tuned["b4"]).astype(int)
+
+
+# find largest improvement from
+pdb.set_trace()
+df["raw_rms"] - df["bis_tuned_rms"]
 
 
 tabfile3 = datadir + ("tuned_params.tex")

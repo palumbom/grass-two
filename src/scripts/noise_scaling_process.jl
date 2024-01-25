@@ -38,10 +38,23 @@ if !isdir(plotsubdir)
     mkdir(plotsubdir)
 end
 
-function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
-                                resolutions::AA{T,1},
-                                nlines_to_do::AA{Int,1},
-                                rvs_std::AA{T,2},
+# get tuned BIS data
+df_tuned = CSV.read(joinpath(datadir, "tuned_params.csv"), DataFrame)
+b1 = df_tuned[template_idx, "b1"]
+b2 = df_tuned[template_idx, "b2"]
+b3 = df_tuned[template_idx, "b3"]
+b4 = df_tuned[template_idx, "b4"]
+
+c1 = df_tuned[template_idx, "c1"]
+c2 = df_tuned[template_idx, "c2"]
+c3 = df_tuned[template_idx, "c3"]
+c4 = df_tuned[template_idx, "c4"]
+c5 = df_tuned[template_idx, "c5"]
+c6 = df_tuned[template_idx, "c6"]
+
+function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2}, lines::AA{T,1},
+                                depths::AA{T,1}, resolutions::AA{T,1},
+                                nlines_to_do::AA{Int,1}, rvs_std::AA{T,2},
                                 rvs_std_decorr::AA{T,2}, snr::T;
                                 plot::Bool=false, oversampling::T=4.0) where T<:Float64
     # include more and more lines in ccf
@@ -60,7 +73,7 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
         flux_window = view(flux_degd, 1:pks[1]+round(Int, (pks[2] - pks[1])/2), 1)
 
         # get width of line at ~92.5% flux
-        idxl, idxr = GRASS.find_wing_index(0.925, flux_window)
+        idxl, idxr = GRASS.find_wing_index(0.95, flux_window)
 
         # get width in angstroms
         width_ang = wavs_window[idxr] - wavs_window[idxl]
@@ -71,6 +84,10 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
         # get the velocity step and velocity window for CCF
         Δv_step = 100.0
         Δv_max = round((width_vel + 1e3)/100) * 100
+        if Δv_max < 15e3
+            Δv_max = 15e3
+        end
+        @show Δv_max
 
         v_grid = range(-Δv_max, Δv_max, step=Δv_step)
 
@@ -124,16 +141,14 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2},
             # get ccf bisector
             vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
 
-            # smooth the bisector
-            vel = GRASS.moving_average(vel, 4)
-            int = GRASS.moving_average(int, 4)
+            # # smooth the bisector
+            # vel = GRASS.moving_average(vel, 4)
+            # int = GRASS.moving_average(int, 4)
 
             # calc bisector summary statistics
-            bis_inv_slope .= GRASS.calc_bisector_inverse_slope(vel, int)
+            bis_inv_slope .= GRASS.calc_bisector_inverse_slope(vel, int, b1=b1, b2=b2, b3=b3, b4=b4)
             # bis_span = GRASS.calc_bisector_span(vel, int)
-            # bis_slope = GRASS.calc_bisector_slope(vel, int)
-            # bis_curve = GRASS.calc_bisector_curvature(vel, int)
-            # bis_bot = GRASS.calc_bisector_bottom(vel, int, rvs1)
+            # bis_curve = GRASS.calc_bisector_curvature(vel, int, c1=c1, c2=c2, c3=c3, c4=c4, c5=c5, c6=c6)
 
             # data to fit
             xdata .= bis_inv_slope
@@ -199,7 +214,7 @@ rvs_std_decorr_out = zeros(length(resolutions), length(nlines_to_do), length(snr
     v2 = view(rvs_std_decorr_out, :, :, i)
 
     # get the stuff
-    std_vs_number_of_lines(wavs, flux, resolutions, nlines_to_do, v1, v2, snrs_for_lines[i])
+    std_vs_number_of_lines(wavs, flux, lines, depths, resolutions, nlines_to_do, v1, v2, snrs_for_lines[i])
 end
 
 # write the data
