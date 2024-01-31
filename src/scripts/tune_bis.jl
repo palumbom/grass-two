@@ -38,21 +38,46 @@ line_files = GRASS.get_file(lp)
 Nloops = 100
 
 # set number of levels tried
-number_levels = 400
+number_levels = 750
 
-# set up array to hold BIS levels
-b1_array = zeros(number_levels)
-b2_array = zeros(number_levels)
-b3_array = zeros(number_levels)
-b4_array = zeros(number_levels)
+# generate bis array
+bis_array = rand(Uniform(0.15, 0.95), 4, number_levels)
+curve_array = rand(Uniform(0.15, 0.95), 6, number_levels)
+for i in 1:number_levels
+    # sort trial
+    bis_array[:, i] .= sort(view(bis_array, :, i))
+    curve_array[:, i] .= sort(view(curve_array, :, i))
 
-# set up array to hold curvature levels
-c1_array = zeros(number_levels)
-c2_array = zeros(number_levels)
-c3_array = zeros(number_levels)
-c4_array = zeros(number_levels)
-c5_array = zeros(number_levels)
-c6_array = zeros(number_levels)
+    # determine if we need to iterate bis
+    d1 = bis_array[2,i] - bis_array[1,i]
+    d2 = bis_array[4,i] - bis_array[3,i]
+
+    iter_bis = ((d1 >= 0.05) & (d2 >= 0.05))
+    while !iter_bis
+        bis_array[:, i] .= sort(rand(Uniform(0.15, 0.95), 4))
+
+        d1 = bis_array[2,i] - bis_array[1,i]
+        d2 = bis_array[4,i] - bis_array[3,i]
+
+        iter_bis = ((d1 >= 0.05) & (d2 >= 0.05))
+    end
+
+    # determine if we need to iterate curve
+    d1 = curve_array[2,i] - curve_array[1,i]
+    d2 = curve_array[4,i] - curve_array[3,i]
+    d3 = curve_array[6,i] - curve_array[5,i]
+
+    iter_curve = ((d1 >= 0.05) & (d2 >= 0.05) & (d3 >= 0.05))
+    while !iter_curve
+        curve_array[:, i] .= sort(rand(Uniform(0.15, 0.95), 6))
+
+        d1 = curve_array[2,i] - curve_array[1,i]
+        d2 = curve_array[4,i] - curve_array[3,i]
+        d3 = curve_array[6,i] - curve_array[5,i]
+
+        iter_curve = ((d1 >= 0.05) & (d2 >= 0.05) & (d3 >= 0.05))
+    end
+end
 
 # set up array to hold correlation coeffs
 r_bis_array = zeros(number_levels, Nloops)
@@ -62,7 +87,7 @@ r_curve_array = zeros(number_levels, Nloops)
 df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
 
 # set up parameters for synthesis
-Nt = 400
+Nt = 160
 lines = [rest_wavelengths[template_idx]]
 templates = [template]
 blueshifts = zeros(length(lines))
@@ -105,40 +130,28 @@ ccf1 = zeros(length(v_grid), Nt)
 # iterate over BIS regions
 for i in 1:number_levels
     # draw BIS levels
-    b1 = rand(Uniform(0.15, 0.75), 1)[1]
-    b2 = rand(Uniform(b1 + 0.05, 0.85), 1)[1]
-    b3 = rand(Uniform(b2, 0.85), 1)[1]
-    b4 = rand(Uniform(b3 + 0.05, 0.95), 1)[1]
+    b1 = bis_array[1, i]
+    b2 = bis_array[2, i]
+    b3 = bis_array[3, i]
+    b4 = bis_array[4, i]
 
     # set the values in the array
-    b1_array[i] = b1
-    b2_array[i] = b2
-    b3_array[i] = b3
-    b4_array[i] = b4
-
-    # draw curvature levels
-    c1 = rand(Uniform(0.15, 0.65), 1)[1]
-    c2 = rand(Uniform(c1 + 0.05, 0.75), 1)[1]
-
-    c3 = rand(Uniform(c2, 0.75), 1)[1]
-    c4 = rand(Uniform(c3 + 0.05, 0.85), 1)[1]
-
-    c5 = rand(Uniform(c4, 0.85), 1)[1]
-    c6 = rand(Uniform(c5 + 0.05, 0.95), 1)[1]
-
-    # set the values in the array
-    c1_array[i] = c1
-    c2_array[i] = c2
-    c3_array[i] = c3
-    c4_array[i] = c4
-    c5_array[i] = c5
-    c6_array[i] = c6
+    c1 = curve_array[1, i]
+    c2 = curve_array[2, i]
+    c3 = curve_array[3, i]
+    c4 = curve_array[4, i]
+    c5 = curve_array[5, i]
+    c6 = curve_array[6, i]
 
     # repeat for Nloop times
     for j in 1:Nloops
+        @show j
         wavs, flux = synthesize_spectra(spec, disk, verbose=false, use_gpu=true)
 
         # measure velocities
+        projection .= 0.0
+        proj_flux .= 0.0
+        ccf1 .= 0.0
         GRASS.calc_ccf!(v_grid, projection, proj_flux, ccf1, wavs, flux, lines,
                         depths, resolution, Δv_step=Δv_step, Δv_max=Δv_max,
                         mask_type=EchelleCCFs.GaussianCCFMask)
@@ -172,7 +185,5 @@ end
 
 # save the results to a file
 jldsave(string(abspath(joinpath(data, template * "_tune_bis.jld2"))),
-        b1=b1_array, b2=b2_array, b3=b3_array,  b4=b4_array,
-        c1=c1_array, c2=c2_array, c3=c3_array, c4=c4_array,
-        c5=c5_array, c6=c6_array, r_bis_array=r_bis_array,
+        bis_array=bis_array, curve_array=curve_array, r_bis_array=r_bis_array,
         r_curve_array=r_curve_array)

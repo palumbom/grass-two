@@ -23,7 +23,7 @@ const plotfile = string(abspath(joinpath(figures, "model_grid.pdf")))
 @assert CUDA.functional()
 
 # set up paramaters for spectrum
-N = 22
+N = 35
 Nt = 1
 disk = DiskParams(N=N, Nt=Nt, inclination=60.0, Nsubgrid=40)
 
@@ -100,8 +100,8 @@ circle1 = mpl.patches.Circle((0, 0), 1.01, color="k", zorder=0)
 ax1.add_patch(circle1)
 
 # coords for zoom in cell
-ϕidx = 10
-θidx = 41
+ϕidx = 16
+θidx = 65
 
 # loop over grid positions
 println("\t>>> Plotting!")

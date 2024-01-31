@@ -52,6 +52,7 @@ for (i, name) in enumerate(line_names)
 
     # load in the data
     d = load(f)
+    @show d
     b1 = d["b1"]
     b2 = d["b2"]
     b3 = d["b3"]

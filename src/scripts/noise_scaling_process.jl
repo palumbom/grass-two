@@ -3,6 +3,8 @@ AA = AbstractArray
 AF = AbstractFloat
 
 # pkgs
+using CSV
+using DataFrames
 using Base.Threads
 using JLD2
 using GRASS
@@ -31,6 +33,7 @@ template = line_names[template_idx]
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
+datadir = string(abspath(data))
 plotsubdir = string(joinpath(figures, "snr_plots"))
 datafile = string(abspath(joinpath(data, template * "_picket_fence.jld2")))
 
@@ -45,12 +48,12 @@ b2 = df_tuned[template_idx, "b2"]
 b3 = df_tuned[template_idx, "b3"]
 b4 = df_tuned[template_idx, "b4"]
 
-c1 = df_tuned[template_idx, "c1"]
-c2 = df_tuned[template_idx, "c2"]
-c3 = df_tuned[template_idx, "c3"]
-c4 = df_tuned[template_idx, "c4"]
-c5 = df_tuned[template_idx, "c5"]
-c6 = df_tuned[template_idx, "c6"]
+# c1 = df_tuned[template_idx, "c1"]
+# c2 = df_tuned[template_idx, "c2"]
+# c3 = df_tuned[template_idx, "c3"]
+# c4 = df_tuned[template_idx, "c4"]
+# c5 = df_tuned[template_idx, "c5"]
+# c6 = df_tuned[template_idx, "c6"]
 
 function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2}, lines::AA{T,1},
                                 depths::AA{T,1}, resolutions::AA{T,1},
@@ -96,7 +99,6 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2}, lines::AA{T,1},
         ccf1 = zeros(len_v, size(flux_degd,2))
         projection_full = zeros(length(wavs_degd), 1)
         proj_flux_full = zeros(length(wavs_degd))
-        ccf1 = zeros(len_v, size(flux_degd,2))
         bis_inv_slope = zeros(size(flux_degd,2))
         xdata = zeros(size(flux_degd,2))
         ydata = zeros(size(flux_degd,2))
@@ -131,6 +133,12 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2}, lines::AA{T,1},
             proj_flux = view(proj_flux_full, 1:length(wavs_view))
 
             # calculate ccf
+            ccf1 .= 0.0
+            projection_full .= 0.0
+            proj_flux_full .= 0.0
+            bis_inv_slope .= 0.0
+            xdata .= 0.0
+            ydata .= 0.0
             GRASS.calc_ccf!(v_grid, projection, proj_flux, ccf1,
                             wavs_view, flux_view, ls, ds, resolutions[i],
                             Δv_step=Δv_step, Δv_max=Δv_max,
@@ -162,27 +170,6 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2}, lines::AA{T,1},
             # decorrelate the velocities
             rvs_to_subtract = pfit.(xdata)
             rvs_std_decorr[i,j] = std(rvs1 .- rvs_to_subtract)
-
-            # plot
-            if plot
-                # get the slope of the fit to plot
-                slope = round(coeffs(pfit)[2], digits=3)
-                fit_label = "\$ " .* string(slope) .* "\$"
-
-                fig2, ax2 = plt.subplots()
-                ax2.scatter(xdata, ydata, c="k", s=2)
-                ax2.plot(xmodel, ymodel, ls="--", c="k", label=L"{\rm Slope } \approx\ " * fit_label, lw=2.5)
-
-                # ax2.set_xlabel(L"{\rm RV\ - \overline{\rm RV}\ } {\rm (m\ s}^{-1}{\rm )}")
-                ax2.set_xlabel(L"{\rm RV\ } {\rm (m\ s}^{-1}{\rm )}")
-                # ax2.set_ylabel(L"{\rm BIS}\ - \overline{\rm BIS}\ {\rm (m\ s}^{-1}{\rm )}")
-                ax2.set_ylabel(L"{\rm BIS\ } {\rm (m\ s}^{-1}{\rm )}")
-                ax2.set_title("SNR = " * string(Int(snr)) * ", Nlines = " * string(nlines_to_do[j]))
-                ax2.legend()
-                ofile = string(joinpath(plotsubdir, "rv_vs_bis_snr_" * string(Int(snr)) * "_lines_" * string(nlines_to_do[j]) * ".pdf"))
-                fig2.savefig(ofile)
-                plt.clf(); plt.close()
-            end
         end
     end
     return nothing

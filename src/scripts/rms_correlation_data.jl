@@ -138,6 +138,9 @@ for i in eachindex(lp.λrest)
         wavs, flux = synthesize_spectra(spec, disk, verbose=false, use_gpu=true)
 
         # measure velocities
+        projection .= 0.0
+        proj_flux .= 0.0
+        ccf .= 0.0
         GRASS.calc_ccf!(v_grid, projection, proj_flux, ccf, wavs, flux, lines,
                         depths, resolution, Δv_step=Δv_step, Δv_max=Δv_max,
                         mask_type=EchelleCCFs.GaussianCCFMask)
