@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH -A dfc13_mri
 #SBATCH -p mgc-mri
-#SBATCH --array=2-10
+#SBATCH --array=9
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=8
 #SBATCH --ntasks=8
-#SBATCH --mem-per-cpu=64GB
+#SBATCH --mem-per-cpu=72GB
 #SBATCH --time=72:00:00
 #SBATCH --job-name=noiseproc
 #SBATCH --chdir=/storage/home/mlp95/work/grass-two

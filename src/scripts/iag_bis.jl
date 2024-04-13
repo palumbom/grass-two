@@ -39,9 +39,11 @@ df = CSV.read(joinpath(datadir, "optimized_depth.csv"), DataFrame)
 
 df_tuned = CSV.read(joinpath(datadir, "tuned_params.csv"), DataFrame)
 
+global k = 1
+
 # wavelength of line to synthesize/compare to iag
 for (i, file) in enumerate(files)
-    # if !contains(file, "FeI_5383")
+    # if !contains(file, "FeI_5382")
     #     continue
     # end
     println(">>> Running " * line_names[i] * "...")
@@ -59,7 +61,7 @@ for (i, file) in enumerate(files)
     flux_iag0 ./= maximum(flux_iag0)
 
     # convolve IAG spectrum to LARS resolution
-    wavs_iag, flux_iag = GRASS.convolve_gauss(wavs_iag0, flux_iag0, new_res=1e6, oversampling=4.0)
+    wavs_iag, flux_iag = GRASS.convolve_gauss(wavs_iag0, flux_iag0, new_res=7e5, oversampling=4.0)
 
    # get depth from IAG spectrum
     buff = 0.12575
@@ -288,8 +290,8 @@ for (i, file) in enumerate(files)
 
         # set tick labels, axis labels, etc.
         ax1.set_xticklabels([])
-        ax1.set_ylabel(L"{\rm Normalized\ Flux}", labelpad=15)
-        ax2.set_xlabel(L"{\rm Wavelength\ (\AA)}")
+        ax1.set_ylabel(L"{\rm Normalized\ Intensity}", labelpad=25)
+        ax2.set_xlabel(L"{\rm Wavelength\ (\AA)}", fontsize=15)
         ax2.set_ylabel(L"{\rm IAG\ -\ GRASS}")
         ax1.legend()
         fig.tight_layout()
@@ -303,6 +305,7 @@ for (i, file) in enumerate(files)
         # save the plot
         fig.subplots_adjust(wspace=0.05)
         fig.savefig(joinpath(plotdir, line_name * "_line.pdf"))
+        fig.savefig(joinpath(plotdir, "f10_" * string(k) * ".pdf"))
         plt.clf(); plt.close()
 
         # plot the bisectors
@@ -327,15 +330,18 @@ for (i, file) in enumerate(files)
         ax2.plot(vel_iag[4:end] .- vel_sim[4:end], int_iag[4:end], c=colors[1], marker="s", ms=2.0, lw=0.0, markevery=1)
         # ax2.plot(vel_mod[2:end] .- vel_sim[2:end], int_mod[2:end], c=colors[2], marker="o", ms=2.0, lw=0.0, markevery=2)
 
+        resids = vel_iag[4:50] .- vel_sim[4:50]
+        @show mean(resids)
+
         # set tick labels, axis labels, etc.
         ax2.set_yticklabels([])
         ax2.yaxis.tick_right()
         ax1.set_ylim(minimum(flux_sim) - 0.05, 1.05)
         ax2.set_xlim(-35, 35)
         ax2.set_ylim(minimum(flux_sim) - 0.05, 1.05)
-        ax1.set_xlabel(L"{\rm Relative\ Velocity\ (m\ s^{-1})}", fontsize=13)
+        ax1.set_xlabel(L"{\rm Relative\ Velocity\ (m\ s^{-1})}", fontsize=15)
         ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
-        ax2.set_xlabel(L"{\rm IAG\ -\ GRASS\ (m\ s^{-1})}", fontsize=13)
+        ax2.set_xlabel(L"{\rm IAG\ -\ GRASS\ (m\ s^{-1})}", fontsize=15)
         ax1.legend(labelspacing=0.25)
         # ax2.legend(loc="upper right", prop=Dict("size"=>12.5), labelspacing=0.25)
 
@@ -345,8 +351,11 @@ for (i, file) in enumerate(files)
         # save the plot
         fig.subplots_adjust(hspace=0.05)
         fig.savefig(joinpath(plotdir, line_name * "_bisector.pdf"))
+        fig.savefig(joinpath(plotdir, "f10_" * string(k + 1) * ".pdf"))
         plt.clf(); plt.close()
         return nothing
     end
     comparison_plots()
+
+    global k += 2
 end

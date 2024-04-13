@@ -54,7 +54,7 @@ for i in eachindex(lp.λrest)
     wavs, flux = synthesize_spectra(spec, disk, verbose=false, use_gpu=true)
 
     # measure velocities
-    v_grid, ccf = calc_ccf(wavs, flux, spec, Δv_step=50.0, Δv_max=30e3)
+    v_grid, ccf = calc_ccf(wavs, flux, spec, Δv_step=50.0, Δv_max=32e3)
     rvs, sigs = calc_rvs_from_ccf(v_grid, ccf)
 
     # measure ccf bisector
@@ -87,13 +87,20 @@ for (i,j) in enumerate(idx)
     vel .-= mean(vel)
 
     # move it over in velocity arbitrarily
-    vel .-= ((length(idx) - k) * 180)
+    vel .-= ((length(idx) - k) * 185)
 
-     if vel[end] - vel[1] < -50
+    if vel[end] - vel[1] < -50
         continue
     end
 
     global k += 1
+
+    title = replace(name[j], "_" => "\\ ")
+
+    if occursin("5382", title)
+        ax1.plot(vel[1:94], int[1:94], c=colors[k])
+        continue
+    end
 
     # ax1.plot(vel, int, c=cmap(k/length(idx)))
     ax1.plot(vel, int, c=colors[k])
@@ -122,9 +129,14 @@ for (i,j) in enumerate(idx)
     global k += 1
 
     title = replace(name[j], "_" => "\\ ")
-    tidx = findfirst("I", title)
-    # title = title[1:tidx-1] * "\\ " * title[tidx:end]
+    tidx = first(findfirst("I", title))
+    title = title[1:tidx-1] * "\\ " * title[tidx:end]
     title = ("\${\\rm " * title * "\\ \\AA }\$")
+
+    if occursin("5382", title)
+        ax2.plot(vel[1:94], int[1:94], label=title, c=colors[k])
+        continue
+    end
 
     # ax2.plot(vel, int, label=title, c=cmap(k/length(idx)))
     ax2.plot(vel, int, label=title, c=colors[k])
@@ -132,11 +144,11 @@ end
 
 # ax1.set_xlabel(L"{\rm Arbitrary\ Velocity}")
 # ax2.set_xlabel(L"{\rm Arbitrary\ Velocity}")
-fig.supxlabel(L"{\rm Arbitrary\ Velocity}", y=0.075)
-ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
+fig.supxlabel(L"{\rm Arbitrary\ Velocity\ (m\ s}^{-1}{\rm )}", y=0.075)
+ax1.set_ylabel(L"{\rm Normalized\ Intensity}", fontsize=16)
 
-ax1.set_xticklabels([])
-ax2.set_xticklabels([])
+# ax1.set_xticklabels([])
+# ax2.set_xticklabels([])
 
 ax2.legend(loc="center left", bbox_to_anchor=(1, 0.5), fontsize=12)
 
@@ -163,7 +175,7 @@ for (i,j) in enumerate(idx)
     vel .-= mean(vel)
 
     # move it over in velocity arbitrarily
-    vel .-= ((length(idx) - k) * 180)
+    vel .-= ((length(idx) - k) * 185)
 
     if vel[end] - vel[1] >= -50
         continue
@@ -175,6 +187,8 @@ for (i,j) in enumerate(idx)
 
     if occursin("5383", title)
         vel .+= 500
+        # ax1.plot(vel[1:90], int[1:90], c=colors[k])
+        # continue
     end
 
     # ax1.plot(vel, int, c=cmap(k/remaining_lines))
@@ -204,21 +218,27 @@ for (i,j) in enumerate(idx)
     global k += 1
 
     title = replace(name[j], "_" => "\\ ")
-    tidx = findfirst("I", title)
-    # title = title[1:tidx-1] * "\\ " * title[tidx:end]
+    tidx = first(findfirst("I", title))
+    title = title[1:tidx-1] * "\\ " * title[tidx:end]
     title = ("\${\\rm " * title * "\\ \\AA }\$")
 
     # ax2.plot(vel, int, label=title, c=cmap(k/remaining_lines))
+
+    # if occursin("5383", title)
+    #     ax2.plot(vel[1:90], int[1:90], label=title, c=colors[k])
+    #     continue
+    # end
+
     ax2.plot(vel, int, label=title, c=colors[k])
 end
 
 # ax1.set_xlabel(L"{\rm Arbitrary\ Velocity}")
 # ax2.set_xlabel(L"{\rm Arbitrary\ Velocity}")
-fig.supxlabel(L"{\rm Arbitrary\ Velocity}", y=0.075)
-ax1.set_ylabel(L"{\rm Normalized\ Intensity}")
+fig.supxlabel(L"{\rm Arbitrary\ Velocity\ (m\ s}^{-1}{\rm )}", y=0.075)
+ax1.set_ylabel(L"{\rm Normalized\ Intensity}", fontsize=16)
 
-ax1.set_xticklabels([])
-ax2.set_xticklabels([])
+# ax1.set_xticklabels([])
+# ax2.set_xticklabels([])
 
 ax2.legend(loc="center left", bbox_to_anchor=(1, 0.5), fontsize=12)
 

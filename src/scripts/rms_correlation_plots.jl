@@ -72,8 +72,8 @@ cbar = fig.colorbar(smap, ax=ax1)
 # cbar.ax.tick_params(labelsize=11)
 cbar.ax.set_ylabel(L"{\rm T}_{1/2}\ {\rm (K)}")
 
-ax1.set_xlabel(L"{\rm RV\ RMS\ (m\ s}^{-1}{\rm )}")
-ax1.set_ylabel(L"{\rm BIS\ RMS\ (m\ s}^{-1}{\rm )}")
+ax1.set_xlabel(L"{\rm RMS\ RV\ (m\ s}^{-1}{\rm )}")
+ax1.set_ylabel(L"{\rm RMS\ BIS\ (m\ s}^{-1}{\rm )}")
 
 fig.savefig(joinpath(plotdir, "rms_vs_rms.pdf"))
 # plt.show()
@@ -94,7 +94,8 @@ xticks = xdata
 xticklabels = []
 for i in eachindex(name)
     title = replace(name[i], "_" => "\\ ")
-    tidx = findfirst("I", title)
+    tidx = first(findfirst("I", title))
+    title = title[1:tidx-1] * "\\ " * title[tidx:end]
     title = "\${\\rm " * title * "\\ \\AA }\$"
     push!(xticklabels, title)
 end
@@ -104,14 +105,14 @@ capsize = 5
 # RMS ladder
 fig, ax1 = plt.subplots(figsize=(9.2,4.8))
 
-ax1.errorbar(xdata, ydata[idx], yerr=yerrs[idx], linestyle="none", c="tab:blue", capsize=capsize, zorder=0, alpha=0.9)
-ax1.scatter(xdata, ydata[idx], marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap, edgecolors="k", s=45)
+ax1.errorbar(xdata, ydata[idx], yerr=yerrs[idx], linestyle="none", c="k", capsize=capsize, zorder=0, alpha=0.9)
+ax1.scatter(xdata, ydata[idx], marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap, edgecolors="k", s=75)
 
 cbar = fig.colorbar(smap, ax=ax1)
 # cbar.ax.tick_params(labelsize=11)
 cbar.ax.set_ylabel(L"{\rm T}_{1/2}\ {\rm (K)}")
 
-ax1.set_ylabel(L"{\rm RV\ RMS\ (m\ s}^{-1}{\rm )}")
+ax1.set_ylabel(L"{\rm RMS\ RV\ (m\ s}^{-1}{\rm )}")
 
 ax1.set_xticks(xticks)
 ax1.set_xticklabels(xticklabels[idx], rotation=90)
@@ -133,17 +134,17 @@ xdata .*= 2.0
 fig, ax1 = plt.subplots(figsize=(9.2,4.8))
 
 ax1.errorbar(xdata, ydata[idx], yerr=yerrs[idx], linestyle="none", c="k", capsize=capsize, zorder=0)
-ax1.scatter(xdata, ydata[idx], marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap, edgecolors="k", s=45)
+ax1.scatter(xdata, ydata[idx], marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap, edgecolors="k", s=75)
 
 ax1.errorbar(xdata, ydata_imp[idx], yerr=yerrs_imp[idx], linestyle="none", c="tab:blue", capsize=capsize, zorder=0, alpha=0.9)
-ax1.scatter(xdata, ydata_imp[idx], marker="d", c=dat, zorder=1, norm=cnorm, cmap=cmap, edgecolors="k", s=45)
+ax1.scatter(xdata, ydata_imp[idx], marker="d", c=dat, zorder=1, norm=cnorm, cmap=cmap, edgecolors="k", s=75)
 
 
 cbar = fig.colorbar(smap, ax=ax1)
 # cbar.ax.tick_params(labelsize=11)
 cbar.ax.set_ylabel(L"{\rm T}_{1/2}\ {\rm (K)}")
 
-ax1.set_ylabel(L"{\rm RV\ RMS\ (m\ s}^{-1}{\rm )}")
+ax1.set_ylabel(L"{\rm RMS\ RV\ (m\ s}^{-1}{\rm )}")
 
 xticks = xdata .+ 0.25
 ax1.set_xticks(xticks)
@@ -170,7 +171,7 @@ fig, ax1 = plt.subplots()
 # ax1, ax2, ax3 = axs
 
 ax1.errorbar(df.avg_temp_50, df.raw_rms, yerr=df.raw_rms_sig, linestyle="none", c="k", capsize=capsize, zorder=0)
-ax1.scatter(df.avg_temp_50, df.raw_rms, marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap)
+ax1.scatter(df.avg_temp_50, df.raw_rms, marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap, s=75, edgecolors="k")
 
 # ax1.set_xlim(minimum(df.avg_temp_50), maximum(df.avg_temp_50))
 # ax1.set_ylim(minimum(df.raw_rms), maximum(df.raw_rms))
@@ -189,7 +190,7 @@ cbar.ax.set_ylabel(L"{\rm T}_{1/2}\ {\rm (K)}")
 ax1.set_xlabel(L"{\rm T}_{1/2}\ {\rm (K)}")
 # ax2.set_xlabel(L"{\rm Depth}")
 # ax3.set_xlabel(L"{\rm Wavelength\ (\AA)}")
-ax1.set_ylabel(L"{\rm RV\ RMS\ (m\ s}^{-1}{\rm )}")
+ax1.set_ylabel(L"{\rm RMS\ RV\ (m\ s}^{-1}{\rm )}")
 
 fig.tight_layout()
 fig.subplots_adjust(hspace=0.1, wspace=0.075)

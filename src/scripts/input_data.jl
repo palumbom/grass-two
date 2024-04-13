@@ -52,7 +52,11 @@ flux_iso = view(flux, idx1:idx2)
 nois_iso = view(flux, idx1:idx2)
 
 # get the bisector
-bis, int1 = GRASS.calc_bisector(wavs_iso, flux_iso, nflux=100, top=maximum(flux_iso) - 0.01)
+bis, int1 = GRASS.calc_bisector(wavs_iso, flux_iso, nflux=50, top=maximum(flux_iso) - 0.01)
+
+# smooth it
+bis = GRASS.moving_average(bis, 4)
+int1 = GRASS.moving_average(int1, 4)
 
 # pad flux_iso with ones
 cont_idxl = findall(x -> (1.0 .- x) .< 0.001, flux[1:idx1])
@@ -95,11 +99,13 @@ ax3 = fig.add_subplot(gs0[3])
 
 # plot the spectra + fits
 ax1.plot(wavs, flux, c="k", label=L"{\rm Binned\ Spectrum}")
-ax1.plot(l_wavs_model, l_flux_model, c=colors[2], ls="-.", label=L"{\rm Blue\ Wing\ Model}")
-ax1.plot(r_wavs_model, r_flux_model, c=colors[1], ls="--", label=L"{\rm Red\ Wing\ Model}")
+ax1.plot(l_wavs_model, l_flux_model, c=colors[1], ls="-.", label=L"{\rm Blue\ Wing\ Model}")
+ax1.plot(r_wavs_model, r_flux_model, c=colors[2], ls="--", label=L"{\rm Red\ Wing\ Model}")
 ax1.legend(fontsize=12)
 
 # plot the bisector
+bfit2 = pfit(int1[3:10], bis[3:10], 1)
+bis[1:3] .= bfit2.(int1[1:3])
 ax2.plot(GRASS.c_ms .* (bis .- mean(bis)) ./ airwav, int1, c="k")
 
 # plot the width function
@@ -107,7 +113,7 @@ ax3.plot(wid, int2, c="k")
 
 # plot horizontal lines
 ax1.axhline(top, ls="--", c="gray")
-ax2.axhline(top, ls="--", c="gray")
+# ax2.axhline(top, ls="--", c="gray")
 ax3.axhline(top, ls="--", c="gray")
 
 # set plot stuff

@@ -22,7 +22,6 @@ colors = ["#56B4E9", "#E69F00", "#009E73", "#CC79A7"]
 
 # get command line args and output directories
 include(joinpath(abspath(@__DIR__), "paths.jl"))
-# include("paths.jl")
 plotdir = string(figures)
 datadir = string(data)
 datafile = string(abspath(joinpath(data, "rms_table.csv")))
@@ -42,7 +41,7 @@ df = DataFrame(line=name, raw_rms=zeros(length(name)), raw_rms_sig=zeros(length(
                bis_span_corr=zeros(length(name)), bis_span_rms=zeros(length(name)), bis_span_sig=zeros(length(name)),
                bis_curve_corr=zeros(length(name)), bis_curve_rms=zeros(length(name)), bis_curve_sig=zeros(length(name)),
                bis_tuned_corr=zeros(length(name)), bis_tuned_rms=zeros(length(name)), bis_tuned_sig=zeros(length(name)),
-               curved_tuned_corr=zeros(length(name)), curved_tuned_rms=zeros(length(name)), curved_tuned_sig=zeros(length(name)))
+               curve_tuned_corr=zeros(length(name)), curve_tuned_rms=zeros(length(name)), curve_tuned_sig=zeros(length(name)))
 
 holder_names = ["bis_inv_slope", "bis_span", "bis_curve", "bis_tuned", "curve_tuned"]
 
@@ -163,7 +162,7 @@ for i in eachindex(lp.λrest)
         bis_span = GRASS.calc_bisector_span(bis, int)
         bis_curve = GRASS.calc_bisector_curvature(bis, int)
         bis_inv_slope_tuned = GRASS.calc_bisector_inverse_slope(bis, int, b1=b1, b2=b2, b3=b3, b4=b4)
-        bis_curvature_tuned = GRASS.calc_bisector_inverse_slope(bis, int, c1=c1, c2=c2, c3=c3, c4=c4, c5=c5, c6=c6)
+        bis_curvature_tuned = GRASS.calc_bisector_curvature(bis, int, c1=c1, c2=c2, c3=c3, c4=c4, c5=c5, c6=c6)
 
         # set up holder for summary statistis and loop over it
         holder = [bis_inv_slope, bis_span, bis_curve, bis_inv_slope_tuned, bis_curvature_tuned]

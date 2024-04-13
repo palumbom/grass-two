@@ -23,7 +23,7 @@ const plotfile = string(abspath(joinpath(figures, "model_grid.pdf")))
 @assert CUDA.functional()
 
 # set up paramaters for spectrum
-N = 35
+N = 28
 Nt = 1
 disk = DiskParams(N=N, Nt=Nt, inclination=60.0, Nsubgrid=40)
 
@@ -93,15 +93,15 @@ norm = mpl.colors.Normalize(vmin=minimum(dat), vmax=maximum(dat))
 smap = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 
 # initialize figure
-fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(16,8))
+fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(12,6))
 
 # plot circle background to smooth jagged edges
 circle1 = mpl.patches.Circle((0, 0), 1.01, color="k", zorder=0)
 ax1.add_patch(circle1)
 
 # coords for zoom in cell
-ϕidx = 16
-θidx = 65
+ϕidx = 12
+θidx = 51
 
 # loop over grid positions
 println("\t>>> Plotting!")
@@ -224,9 +224,6 @@ z0 = z
 x = x0 * R_x[1,1] + y0 * R_x[1,2] + z0 * R_x[1,3]
 y = x0 * R_x[2,1] + y0 * R_x[2,2] + z0 * R_x[2,3]
 z = x0 * R_x[3,1] + y0 * R_x[3,2] + z0 * R_x[3,3]
-# ax2.scatter([x], [y], color=smap.to_rgba(dat_to_save), marker="s", s=100, zorder=3)
-# ax2.scatter([x], [y], color="k", marker="s", s=125, zorder=2)
-
 
 
 lat = range(ϕe[ϕidx], ϕe[ϕidx+1], length=5)
@@ -273,15 +270,14 @@ end
 
 # plot cells around focused cell
 for i in ϕidx-1:ϕidx+1
-    for j in θidx-1:θidx+1
-        lat_gray = ϕc[i]
-        lon_gray = θc[i,j]
+    # find the starting index
+    idx_idk = findfirst(x -> x .>= θc[ϕidx, θidx], θc[i, :])
+    for j in idx_idk-2:idx_idk+2
+        lat2 = range(ϕe[i], ϕe[i+1], length=5)
+        lon2 = range(θe[i,j], θe[i,j+1], length=5)
 
-        lat = range(ϕe[i], ϕe[i+1], length=5)
-        lon = range(θe[i,j], θe[i,j+1], length=5)
-
-        border = (([lat[1], lat[2], lat[3], lat[4], lat[5], lat[5], lat[5], lat[5], lat[5], lat[4], lat[3], lat[2], lat[1], lat[1], lat[1], lat[1], lat[1]]),
-                 ([lon[1], lon[1], lon[1], lon[1], lon[1], lon[2], lon[3], lon[4], lon[5], lon[5], lon[5], lon[5], lon[5], lon[4], lon[3], lon[2], lon[1]]))
+        border = (([lat2[1], lat2[2], lat2[3], lat2[4], lat2[5], lat2[5], lat2[5], lat2[5], lat2[5], lat2[4], lat2[3], lat2[2], lat2[1], lat2[1], lat2[1], lat2[1], lat2[1]]),
+                 ([lon2[1], lon2[1], lon2[1], lon2[1], lon2[1], lon2[2], lon2[3], lon2[4], lon2[5], lon2[5], lon2[5], lon2[5], lon2[5], lon2[4], lon2[3], lon2[2], lon2[1]]))
 
         out = GRASS.sphere_to_cart.(1.0, border...)
         x = getindex.(out, 1)
@@ -299,6 +295,7 @@ for i in ϕidx-1:ϕidx+1
             z[k] = x0 * R_x[3,1] + y0 * R_x[3,2] + z0 * R_x[3,3]
         end
         ax2.plot(x, y, color="k", lw=1, alpha=0.33, zorder=0)
+
     end
 end
 
@@ -353,16 +350,15 @@ for i in eachindex(lat)
 
         # get the mu
         μ = GRASS.calc_mu([xcen,ycen,zcen], [0.0,0.0,1e6])
+        ld = GRASS.quad_limb_darkening(μ, 0.4, 0.26)
 
         # get the area of the subtile
-        dA = sin(π/2 - lat3) * (last(lat2) - first(lat2)) * (last(lon2) - first(lon2))
+        dA = sin(π/2 - lat3) * (maximum(lat2) - minimum(lat2)) * (maximum(lon2) - minimum(lon2))
+        dA_proj = dA * μ
 
-        # project it
-        dA_proj = dA * abs(dot([xcen,ycen,zcen] .- [0.0,0.0,1e6], [xcen,ycen,zcen])) / LinearAlgebra.norm([0.0,0.0,1e6])
-
-        tdat = μ * dA_proj * 16 / maximum(wts_gpu)
+        tdat = ld * dA_proj * 16 / maximum(wts_gpu)
         ax2.fill(x, y, color=smap.to_rgba(tdat))
-        ax2.scatter([xcen], [ycen], c="k", s=125)
+        ax2.scatter([xcen], [ycen], c="k", s=60)
         # ax2.scatter([xcen], [ycen], color=smap.to_rgba(tdat), s=100)
     end
 end
@@ -397,10 +393,12 @@ fig.add_artist(l3)
 fig.add_artist(l4)
 
 
-ax1.set_xlabel(L"\Delta x\ {\rm [Apparent\ Stellar\ Radii]}")
-ax1.set_ylabel(L"\Delta y\ {\rm [Apparent\ Stellar\ Radii]}")
-ax2.set_xlabel(L"\Delta x\ {\rm [Apparent\ Stellar\ Radii]}")
-ax2.set_ylabel(L"\Delta y\ {\rm [Apparent\ Stellar\ Radii]}")
+ax1.set_xlabel(L"\Delta x\ {\rm [Stellar\ Radii]}", fontsize=14)
+ax1.set_ylabel(L"\Delta y\ {\rm [Stellar\ Radii]}", fontsize=14)
+ax2.set_xlabel(L"\Delta x\ {\rm [Stellar\ Radii]}", fontsize=14)
+ax2.set_ylabel(L"\Delta y\ {\rm [Stellar\ Radii]}", fontsize=14)
+ax1.tick_params(axis="both", labelsize=14)
+ax2.tick_params(axis="both", labelsize=14)
 ax2.yaxis.tick_right()
 ax2.yaxis.set_label_position("right")
 ax1.set_aspect("equal")
@@ -412,9 +410,9 @@ ax2.invert_xaxis()
 
 fig.tight_layout()
 
-cax = fig.add_axes([ax2.get_position().x1+0.075,ax1.get_position().y0,0.02,ax1.get_position().height])
+cax = fig.add_axes([ax2.get_position().x1+0.085,ax1.get_position().y0,0.02,ax1.get_position().height])
 cb = fig.colorbar(smap, cax=cax)
-cb.set_label(L"{\rm Relative\ Weight}")
+cb.set_label(L"{\rm Relative\ Weight}", fontsize=14)
 fig.savefig(plotfile)
 # plt.show()
 plt.clf(); plt.close();
