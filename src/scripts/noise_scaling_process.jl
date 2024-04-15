@@ -177,7 +177,7 @@ templates = d["templates"]
 # snrs to loop over
 nlines_to_do = [50, 100, 150, 200, 250, 300, 400, 500]
 snrs_for_lines = [200.0, 300.0, 400.0, 500.0, 750.0, 1000.0]
-resolutions = [0.98e5, 1.2e5, 1.375e5, 1.9e5, 2.7e5, 3.5e5]
+resolutions = [0.98e5, 1.2e5, 1.375e5, 1.9e5, 2.705e5, 3.5e5]
 
 # allocate memory for output
 rvs_std_out = zeros(length(resolutions), length(nlines_to_do), Ntrials, length(snrs_for_lines))
