@@ -173,6 +173,9 @@ fig, ax1 = plt.subplots()
 ax1.errorbar(df.avg_temp_50, df.raw_rms, yerr=df.raw_rms_sig, linestyle="none", c="k", capsize=capsize, zorder=0)
 ax1.scatter(df.avg_temp_50, df.raw_rms, marker="o", c=dat, zorder=1, norm=cnorm, cmap=cmap, s=75, edgecolors="k")
 
+# ax1.errorbar(df.avg_temp_50, ydata_imp, yerr=yerrs_imp, linestyle="none", c="tab:blue", capsize=capsize, zorder=0)
+# ax1.scatter(df.avg_temp_50, ydata_imp, marker="d", c=dat, zorder=1, norm=cnorm, cmap=cmap, s=75, edgecolors="k")
+
 # ax1.set_xlim(minimum(df.avg_temp_50), maximum(df.avg_temp_50))
 # ax1.set_ylim(minimum(df.raw_rms), maximum(df.raw_rms))
 

@@ -99,8 +99,8 @@ ax3 = fig.add_subplot(gs0[3])
 
 # plot the spectra + fits
 ax1.plot(wavs, flux, c="k", label=L"{\rm Binned\ Spectrum}")
-ax1.plot(l_wavs_model, l_flux_model, c=colors[1], ls="-.", label=L"{\rm Blue\ Wing\ Model}")
-ax1.plot(r_wavs_model, r_flux_model, c=colors[2], ls="--", label=L"{\rm Red\ Wing\ Model}")
+ax1.plot(l_wavs_model, l_flux_model, c=colors[1], lw=2, ls="-.", label=L"{\rm Blue\ Wing\ Model}")
+ax1.plot(r_wavs_model, r_flux_model, c=colors[2], lw=2, ls="--", label=L"{\rm Red\ Wing\ Model}")
 ax1.legend(fontsize=12)
 
 # plot the bisector
@@ -120,7 +120,7 @@ ax3.axhline(top, ls="--", c="gray")
 ax1.set_xlim(wavs[min] - 0.76, wavs[min] + 0.76)
 ax1.set_xlabel(L"{\rm Wavelength\ (\AA)}")
 ax1.set_ylabel(L"{\rm Normalized\ Flux}")
-ax2.set_xlabel(L"{\rm Relative\ Velocity\ (ms^{-1})}")
+ax2.set_xlabel(L"{\rm Relative\ Velocity\ (m\ s^{-1})}")
 ax3.set_xlabel(L"{\rm Width\ (\AA)}")
 
 # set ticks

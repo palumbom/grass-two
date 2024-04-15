@@ -69,15 +69,16 @@ line_depths = GRASS.get_depth(lp)
 line_names = GRASS.get_name(lp)
 
 # get line title
-idx = 9
+idx = 5
 file = line_names[idx]
 title = replace(line_names[idx], "_" => "\\ ")
 tidx = findfirst('I', title)
 title = title[1:tidx-1] * "\\ " * title[tidx:end]
 title = ("\${\\rm " * title * "\\ \\AA }\$")
+@show file
 
 # set the color
-instr_idx = 4
+instr_idx = 1
 c = color[instr_idx]
 instrument = ["LARS", "PEPSI", "NEID", "KPF"]
 res_float = [7e5, 2.7e5, 1.2e5, 0.98e5]
@@ -104,7 +105,8 @@ spec1 = SpecParams(lines=lines, depths=depths, variability=variability,
                    resolution=resolution, oversampling=2.0)
 
 global keep_going = true
-while keep_going
+# while keep_going
+for i in 1:10
     # generate the spectra
     wavs_out, flux_out = synthesize_spectra(spec1, disk, seed_rng=seed_rng,
                                             verbose=true, use_gpu=true)
@@ -128,6 +130,9 @@ while keep_going
     # calculate bisector
     bis, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
 
+    # plt.plot(bis, int)
+    # plt.show()
+
     # get continuum and depth
     top = 1.0
     dep = top - minimum(int)
@@ -146,6 +151,8 @@ while keep_going
 
     # get BIS
     bis_inv_slope = GRASS.calc_bisector_inverse_slope(bis, int, b1=b1, b2=b2, b3=b3, b4=b4)
+
+    @show mean(bis_inv_slope)
 
     # mean subtract the bisector plotting (remove bottommost and topmost measurements)
     idx_start = 3#4
@@ -193,7 +200,7 @@ while keep_going
     end
 end
 
-# now plot the final frame
+#=# now plot the final frame
 fig, (ax1, ax2) = plt.subplots(nrows=1, ncols=2, figsize=(12.15, 7.2))
 fig.subplots_adjust(wspace=0.05)
 
@@ -205,7 +212,7 @@ ax1.axhline(int[idx90,1], ls=":", c="k")
 ax2.plot(xmodel, ymodel, c="k", ls="--", label=L"{\rm R } \approx\ " * fit_label * L"{\rm , SNR } \sim \infty", zorder=1)
 
 # create lines
-path_effects =[pe.Stroke(linewidth=5, foreground="k"), pe.Normal()]
+path_effects = [pe.Stroke(linewidth=5, foreground="k"), pe.Normal()]
 
 # annotate vt and vb
 arrowprops = Dict("facecolor"=>"black", "shrink"=>0.05, "width"=>2.0,"headwidth"=>8.0)
@@ -419,3 +426,4 @@ plt.close("all")
 
 
 
+=#

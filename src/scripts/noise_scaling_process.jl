@@ -37,13 +37,13 @@ const b3 = df_tuned[template_idx, "b3"]
 const b4 = df_tuned[template_idx, "b4"]
 
 # set number of trials
-const Ntrials = 1
+const Ntrials = 50
 
 # function to loop over
 function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2}, lines::AA{T,1},
                                 depths::AA{T,1}, resolutions::AA{T,1},
-                                nlines_to_do::AA{Int,1}, rvs_std::AA{T,2},
-                                rvs_std_decorr::AA{T,2}, snr::T;
+                                nlines_to_do::AA{Int,1}, rvs_std::AA{T,3},
+                                rvs_std_decorr::AA{T,3}, snr::T;
                                 plot::Bool=false, oversampling::T=4.0) where T<:Float64
     # include more and more lines in ccf
     for i in eachindex(resolutions)
@@ -94,7 +94,7 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2}, lines::AA{T,1},
 
         # loop over number of lines
         for j in eachindex(nlines_to_do)
-            # loop over number of trials
+            # loop over Ntrials
             for n in 1:Ntrials
                 # copy it over
                 copyto!(flux_snr, flux_degd)
@@ -142,7 +142,7 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2}, lines::AA{T,1},
 
                 # calculate the RVs and get the RMS
                 rvs1, sigs1 = calc_rvs_from_ccf(v_grid, ccf1, frac_of_width_to_fit=0.5)
-                rvs_std[i,j] += calc_rms(rvs1)
+                rvs_std[i,j,n] = calc_rms(rvs1)
 
                 # get ccf bisector
                 vel, int = GRASS.calc_bisector(v_grid, ccf1, nflux=100, top=0.99)
@@ -159,14 +159,8 @@ function std_vs_number_of_lines(wavs::AA{T,1}, flux::AA{T,2}, lines::AA{T,1},
 
                 # decorrelate the velocities
                 rvs_to_subtract = pfit.(xdata)
-                rvs_std_decorr[i,j] += calc_rms(rvs1 .- rvs_to_subtract)
+                rvs_std_decorr[i,j,n] = calc_rms(rvs1 .- rvs_to_subtract)
             end
-            # take average of Ntrials
-            rvs_std[i,j] /= Ntrials
-            rvs_std_decorr[i,j] /= Ntrials
-
-            # @show rvs_std[i,j]
-            # @show rvs_std_decorr[i,j]
         end
     end
     return nothing
@@ -175,7 +169,7 @@ end
 # read in the data
 d = load(datafile)
 wavs = d["wavs"]
-flux = d["flux"][:, 1:160]#[:, 100:800]
+flux = d["flux"][:, 1:160]
 lines = d["lines"]
 depths = d["depths"]
 templates = d["templates"]
@@ -186,14 +180,14 @@ snrs_for_lines = [200.0, 300.0, 400.0, 500.0, 750.0, 1000.0]
 resolutions = [0.98e5, 1.2e5, 1.375e5, 1.9e5, 2.7e5, 3.5e5]
 
 # allocate memory for output
-rvs_std_out = zeros(length(resolutions), length(nlines_to_do), length(snrs_for_lines))
-rvs_std_decorr_out = zeros(length(resolutions), length(nlines_to_do), length(snrs_for_lines))
+rvs_std_out = zeros(length(resolutions), length(nlines_to_do), Ntrials, length(snrs_for_lines))
+rvs_std_decorr_out = zeros(length(resolutions), length(nlines_to_do), Ntrials, length(snrs_for_lines))
 
 # loop over snrs
 @threads for k in eachindex(snrs_for_lines)
     # get views of output arrays
-    v1 = view(rvs_std_out, :, :, k)
-    v2 = view(rvs_std_decorr_out, :, :, k)
+    v1 = view(rvs_std_out, :, :, :, k)
+    v2 = view(rvs_std_decorr_out, :, :, :, k)
 
     # get the stuff
     std_vs_number_of_lines(wavs, flux, lines, depths, resolutions, nlines_to_do, v1, v2, snrs_for_lines[k])

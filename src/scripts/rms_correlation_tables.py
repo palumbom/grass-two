@@ -78,6 +78,8 @@ df_tuned["bis_tuned_rms"] = np.round(df["bis_tuned_rms"], decimals=2)
 df_tuned["bis_tuned_sig"] = np.round(df["bis_tuned_sig"], decimals=2)
 df_tuned["bis_tuned_impr"] = (np.round(100 * (df["raw_rms"] - df["bis_tuned_rms"]) / df["raw_rms"], decimals=0)).astype(int)
 
+pdb.set_trace()
+
 df_tuned["b1"] *= 100
 df_tuned["b2"] *= 100
 df_tuned["b3"] *= 100
@@ -110,10 +112,10 @@ df_tuned["c6"] = (df_tuned["c6"]).astype(int)
 tabfile3 = datadir + ("tuned_params.tex")
 df_tuned.to_latex(buf=tabfile3, na_rep="-", columns=["line", 'b1', 'b2', 'b3', 'b4',
                                                      'bis_med_pearson', 'bis_tuned_rms',
-                                                     'bis_tuned_rms', 'bis_tuned_impr',
+                                                     'bis_tuned_sig', 'bis_tuned_impr',
                                                      'c1', 'c2', 'c3', 'c4', 'c5', 'c6',
                                                      'curve_med_pearson', 'curve_tuned_rms',
-                                                     'curve_tuned_rms', 'curve_tuned_impr'], index=False)
+                                                     'curve_tuned_sig', 'curve_tuned_impr'], index=False)
 
 # find largest improvement from
 # print(df["raw_rms"] - df["bis_tuned_rms"])
